@@ -101,14 +101,14 @@ class DCT_Admin {
 
     public static function page_dashboard(): void {
         if ( ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'Not allowed.', 'dct' ) );
+            wp_die( esc_html__( 'Not allowed.', 'dev-code-tracker' ) );
         }
         include DCT_PLUGIN_DIR . 'templates/dashboard.php';
     }
 
     public static function page_sessions(): void {
         if ( ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'Not allowed.', 'dct' ) );
+            wp_die( esc_html__( 'Not allowed.', 'dev-code-tracker' ) );
         }
         global $wpdb;
         $sessions = $wpdb->get_results(
@@ -166,7 +166,7 @@ class DCT_Admin {
 
     public static function page_settings(): void {
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Not allowed.', 'dct' ) );
+            wp_die( esc_html__( 'Not allowed.', 'dev-code-tracker' ) );
         }
         ?>
         <div class="wrap">

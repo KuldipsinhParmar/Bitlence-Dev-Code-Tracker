@@ -10,7 +10,7 @@
  * Author URI:        https://github.com/kuldipparmar18
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       dct
+ * Text Domain:       dev-code-tracker
  * Domain Path:       /languages
  */
 
@@ -33,7 +33,7 @@ add_action( 'plugins_loaded', function () {
         DCT_DB::install();
     }
 
-    load_plugin_textdomain( 'dct', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+    load_plugin_textdomain( 'dev-code-tracker', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
     DCT_Ajax::init();
     DCT_Settings::init();
