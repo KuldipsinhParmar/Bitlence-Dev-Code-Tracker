@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Dev Code Tracker" width="160">
+</p>
+
 # Dev Code Tracker
 
 A WordPress plugin that tracks time spent in wp-admin per page/post — porting the VS Code Dev Code Tracker extension logic 1:1 into WordPress.
