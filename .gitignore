@@ -1,0 +1,8 @@
+# VS Code Dev Code Tracker extension data
+.devCodeTracker/
+
+# macOS
+.DS_Store
+
+# Node / npm (if ever used for build tooling)
+node_modules/
