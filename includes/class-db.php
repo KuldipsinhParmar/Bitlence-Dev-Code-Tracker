@@ -61,7 +61,7 @@ class DCT_DB {
             $formats[]         = '%d';
         }
 
-        $result = $wpdb->insert(
+        $result = $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $wpdb->prefix . 'dct_time_sessions',
             $fields,
             $formats
@@ -79,7 +79,7 @@ class DCT_DB {
         $user_id = get_current_user_id();
         // Pass $seconds twice: once for the INSERT value, once for the UPDATE expression.
         // Avoids both the deprecated VALUES() function and the MySQL 8.0.19+ row-alias syntax.
-        $wpdb->query(
+        $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "INSERT INTO {$wpdb->prefix}dct_daily_summary (user_id, summary_date, total_sec)
                  VALUES (%d, %s, %d)
@@ -92,9 +92,9 @@ class DCT_DB {
     public static function get_dashboard( int $user_id ): array {
         global $wpdb;
         $today = current_time( 'Y-m-d' );
-        $week  = date( 'Y-m-d', strtotime( '-6 days', strtotime( $today ) ) );
+        $week  = wp_date( 'Y-m-d', strtotime( '-6 days', strtotime( $today ) ) );
 
-        $today_sec = (int) $wpdb->get_var(
+        $today_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}dct_daily_summary
                  WHERE user_id=%d AND summary_date=%s",
@@ -102,7 +102,7 @@ class DCT_DB {
             )
         );
 
-        $week_sec = (int) $wpdb->get_var(
+        $week_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}dct_daily_summary
                  WHERE user_id=%d AND summary_date BETWEEN %s AND %s",
@@ -110,7 +110,7 @@ class DCT_DB {
             )
         );
 
-        $all_sec = (int) $wpdb->get_var(
+        $all_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}dct_daily_summary
                  WHERE user_id=%d",
@@ -118,18 +118,18 @@ class DCT_DB {
             )
         );
 
-        $daily_30 = $wpdb->get_results(
+        $daily_30 = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT summary_date AS date, total_sec AS seconds
                  FROM {$wpdb->prefix}dct_daily_summary
                  WHERE user_id=%d AND summary_date >= %s
                  ORDER BY summary_date ASC",
-                $user_id, date( 'Y-m-d', strtotime( '-29 days', strtotime( $today ) ) )
+                $user_id, wp_date( 'Y-m-d', strtotime( '-29 days', strtotime( $today ) ) )
             ),
             ARRAY_A
         );
 
-        $recent = $wpdb->get_results(
+        $recent = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT id, post_id, post_type, admin_page, started_at, duration_sec
                  FROM {$wpdb->prefix}dct_time_sessions
@@ -140,7 +140,7 @@ class DCT_DB {
             ARRAY_A
         );
 
-        $per_page = $wpdb->get_results(
+        $per_page = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT s.post_id, s.post_type, s.admin_page,
                         COALESCE(MAX(p.post_title), s.admin_page, 'Unknown') AS page_label,
@@ -164,7 +164,7 @@ class DCT_DB {
 
     public static function get_streak( int $user_id ): int {
         global $wpdb;
-        $dates = $wpdb->get_col(
+        $dates = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT summary_date FROM {$wpdb->prefix}dct_daily_summary
                  WHERE user_id = %d AND total_sec > 0
@@ -179,7 +179,7 @@ class DCT_DB {
         }
 
         $today     = current_time( 'Y-m-d' );
-        $yesterday = date( 'Y-m-d', strtotime( '-1 day', strtotime( $today ) ) );
+        $yesterday = wp_date( 'Y-m-d', strtotime( '-1 day', strtotime( $today ) ) );
 
         // Streak is 0 if there's no activity today or yesterday.
         if ( $dates[0] !== $today && $dates[0] !== $yesterday ) {
@@ -191,7 +191,7 @@ class DCT_DB {
         foreach ( $dates as $date ) {
             if ( $date === $check ) {
                 $streak++;
-                $check = date( 'Y-m-d', strtotime( '-1 day', strtotime( $check ) ) );
+                $check = wp_date( 'Y-m-d', strtotime( '-1 day', strtotime( $check ) ) );
             } else {
                 break;
             }
@@ -202,8 +202,8 @@ class DCT_DB {
 
     public static function delete_user_data( int $user_id ): void {
         global $wpdb;
-        $wpdb->delete( $wpdb->prefix . 'dct_time_sessions',  [ 'user_id' => $user_id ], [ '%d' ] );
-        $wpdb->delete( $wpdb->prefix . 'dct_daily_summary',  [ 'user_id' => $user_id ], [ '%d' ] );
-        $wpdb->delete( $wpdb->prefix . 'dct_projects',       [ 'user_id' => $user_id ], [ '%d' ] );
+        $wpdb->delete( $wpdb->prefix . 'dct_time_sessions',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete( $wpdb->prefix . 'dct_daily_summary',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete( $wpdb->prefix . 'dct_projects',       [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
     }
 }

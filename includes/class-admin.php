@@ -71,9 +71,9 @@ class DCT_Admin {
         if ( $hook === 'toplevel_page_dct' ) {
             wp_enqueue_script(
                 'chartjs',
-                'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js',
+                DCT_PLUGIN_URL . 'assets/chart.min.js',
                 [],
-                '4',
+                '4.4.9',
                 true
             );
             // No dependency on dct-tracker — liveSessionSec() handles window.dctTracker being absent.
@@ -111,7 +111,7 @@ class DCT_Admin {
             wp_die( esc_html__( 'Not allowed.', 'dev-code-tracker' ) );
         }
         global $wpdb;
-        $sessions = $wpdb->get_results(
+        $sessions = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT s.*, COALESCE(p.post_title, s.admin_page, 'Unknown') AS page_label
                  FROM {$wpdb->prefix}dct_time_sessions s
@@ -198,14 +198,15 @@ class DCT_Admin {
             'idleMs'        => DCT_Settings::idle_ms(),
             'minSessionSec' => DCT_Settings::min_session_sec(),
         ];
-        echo '<script>window.dctConfig=' . wp_json_encode( $config ) . ';</script>' . "\n";
-        echo '<script src="' . esc_url( DCT_PLUGIN_URL . 'assets/tracker.js' ) . '?v=' . esc_attr( DCT_VERSION ) . '"></script>' . "\n";
+        wp_add_inline_script( 'dct-tracker', 'window.dctConfig=' . wp_json_encode( $config ) . ';', 'before' );
+        wp_enqueue_script( 'dct-tracker' );
+        wp_print_scripts( [ 'dct-tracker' ] );
     }
 
     public static function widget_today(): void {
         global $wpdb;
         $today = current_time( 'Y-m-d' );
-        $sec   = (int) $wpdb->get_var(
+        $sec   = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}dct_daily_summary
                  WHERE user_id=%d AND summary_date=%s",
@@ -217,7 +218,7 @@ class DCT_Admin {
         } else {
             $h = intdiv( $sec, 3600 );
             $m = intdiv( $sec % 3600, 60 );
-            printf( '<p style="font-size:2em;text-align:center;margin:8px 0">%dh %dm</p>', $h, $m );
+            printf( '<p style="font-size:2em;text-align:center;margin:8px 0">%dh %dm</p>', absint( $h ), absint( $m ) );
         }
         printf(
             '<p style="text-align:center;margin:4px 0 0"><a href="%s">Full Dashboard →</a></p>',

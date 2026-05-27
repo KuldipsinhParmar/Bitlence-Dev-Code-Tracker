@@ -4,9 +4,9 @@ defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 global $wpdb;
 
-$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}dct_time_sessions" );
-$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}dct_daily_summary" );
-$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}dct_projects" );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}dct_time_sessions" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}dct_daily_summary" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}dct_projects" );      // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 
 delete_option( 'dct_db_version' );
 delete_option( 'dct_idle_timeout' );

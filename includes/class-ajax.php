@@ -64,7 +64,7 @@ class DCT_Ajax {
         if ( ! $id || ! $label ) {
             wp_send_json_error( 'invalid_data', 400 );
         }
-        $wpdb->update(
+        $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prefix . 'dct_projects',
             [ 'label' => $label ],
             [ 'id' => $id, 'user_id' => get_current_user_id() ],
@@ -80,7 +80,7 @@ class DCT_Ajax {
         if ( ! $id ) {
             wp_send_json_error( 'invalid_data', 400 );
         }
-        $wpdb->delete(
+        $wpdb->delete( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prefix . 'dct_projects',
             [ 'id' => $id, 'user_id' => get_current_user_id() ],
             [ '%d', '%d' ]

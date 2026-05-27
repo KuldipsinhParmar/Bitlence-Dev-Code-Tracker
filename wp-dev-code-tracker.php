@@ -33,8 +33,6 @@ add_action( 'plugins_loaded', function () {
         DCT_DB::install();
     }
 
-    load_plugin_textdomain( 'dev-code-tracker', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
-
     DCT_Ajax::init();
     DCT_Settings::init();
     DCT_Admin::init();

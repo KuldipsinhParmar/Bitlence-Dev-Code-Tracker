@@ -30,8 +30,8 @@ class DCT_Settings {
     public static function field_number( array $args ): void {
         $default = self::DEFAULTS[ $args['option'] ] ?? 0;
         $val     = (int) get_option( $args['option'], $default );
-        $min     = isset( $args['min'] ) ? "min=\"{$args['min']}\"" : '';
-        echo "<input type=\"number\" name=\"{$args['option']}\" value=\"{$val}\" {$min} class=\"small-text\">";
+        $min = isset( $args['min'] ) ? 'min="' . esc_attr( (string) $args['min'] ) . '"' : '';
+        echo '<input type="number" name="' . esc_attr( $args['option'] ) . '" value="' . esc_attr( (string) $val ) . '" ' . $min . ' class="small-text">';
     }
 
     public static function field_roles(): void {
@@ -39,7 +39,7 @@ class DCT_Settings {
         foreach ( wp_roles()->get_names() as $slug => $name ) {
             $checked = in_array( $slug, $saved, true ) ? 'checked' : '';
             $label   = esc_html( translate_user_role( $name ) );
-            echo "<label><input type=\"checkbox\" name=\"dct_track_roles[]\" value=\"{$slug}\" {$checked}> {$label}</label>&nbsp; ";
+            echo '<label><input type="checkbox" name="dct_track_roles[]" value="' . esc_attr( $slug ) . '" ' . $checked . '> ' . $label . '</label>&nbsp; ';
         }
     }
 
