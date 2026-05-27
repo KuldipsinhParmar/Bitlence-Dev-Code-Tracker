@@ -30,16 +30,17 @@ class DCT_Settings {
     public static function field_number( array $args ): void {
         $default = self::DEFAULTS[ $args['option'] ] ?? 0;
         $val     = (int) get_option( $args['option'], $default );
-        $min = isset( $args['min'] ) ? 'min="' . esc_attr( (string) $args['min'] ) . '"' : '';
-        echo '<input type="number" name="' . esc_attr( $args['option'] ) . '" value="' . esc_attr( (string) $val ) . '" ' . $min . ' class="small-text">';
+        echo '<input type="number" name="' . esc_attr( $args['option'] ) . '" value="' . esc_attr( (string) $val ) . '"'
+            . ( isset( $args['min'] ) ? ' min="' . esc_attr( (string) $args['min'] ) . '"' : '' )
+            . ' class="small-text">';
     }
 
     public static function field_roles(): void {
         $saved = (array) get_option( 'dct_track_roles', [ 'administrator', 'editor' ] );
         foreach ( wp_roles()->get_names() as $slug => $name ) {
-            $checked = in_array( $slug, $saved, true ) ? 'checked' : '';
-            $label   = esc_html( translate_user_role( $name ) );
-            echo '<label><input type="checkbox" name="dct_track_roles[]" value="' . esc_attr( $slug ) . '" ' . $checked . '> ' . $label . '</label>&nbsp; ';
+            echo '<label><input type="checkbox" name="dct_track_roles[]" value="' . esc_attr( $slug ) . '"'
+                . checked( in_array( $slug, $saved, true ), true, false )
+                . '> ' . esc_html( translate_user_role( $name ) ) . '</label>&nbsp; ';
         }
     }
 
