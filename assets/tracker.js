@@ -1,11 +1,11 @@
-/* Dev Code Tracker — session tracking */
+/* Bitlence Dev Code Tracker — session tracking */
 ( function () {
     'use strict';
 
-    const cfg       = window.dctConfig || {};
+    const cfg       = window.bdctConfig || {};
     const idleMs    = cfg.idleMs        || 5 * 60 * 1000;
     const minSec    = cfg.minSessionSec || 60;
-    const QUEUE_KEY = 'dct_pending_sessions';
+    const QUEUE_KEY = 'bdct_pending_sessions';
 
     let activeSession     = null;
     let lastTouchMs       = 0;
@@ -111,7 +111,7 @@
 
     function buildPayload( data ) {
         const fd = new FormData();
-        fd.append( 'action', 'dct_save_session' );
+        fd.append( 'action', 'bdct_save_session' );
         fd.append( 'nonce',  cfg.nonce );
         Object.keys( data ).forEach( function ( k ) { fd.append( k, data[ k ] ); } );
         return fd;
@@ -150,7 +150,7 @@
 
     /* ── toolbar ── */
     function updateToolbar() {
-        const el = document.getElementById( 'dct-toolbar-time' );
+        const el = document.getElementById( 'bdct-toolbar-time' );
         if ( ! el || ! activeSession ) return;
         const sec = Math.round(
             ( Date.now() - new Date( activeSession.started_at.replace( ' ', 'T' ) + 'Z' ).getTime() ) / 1000
@@ -252,7 +252,7 @@
         endSession();
     } );
 
-    window.dctTracker = { getActiveSession: function () { return activeSession; } };
+    window.bdctTracker = { getActiveSession: function () { return activeSession; } };
 
     flushQueue( /* useBeacon= */ false );
     startSession();

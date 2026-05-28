@@ -1,8 +1,8 @@
-/* Dev Code Tracker — dashboard data + chart rendering */
+/* Bitlence Dev Code Tracker — dashboard data + chart rendering */
 ( function () {
     'use strict';
 
-    const cfg = window.dctConfig || {};
+    const cfg = window.bdctConfig || {};
     let chartInstance = null;
     let serverData    = null;
     let loading       = false;
@@ -28,7 +28,7 @@
 
     /* ── live session elapsed seconds ── */
     function liveSessionSec() {
-        const tracker = window.dctTracker;
+        const tracker = window.bdctTracker;
         if ( ! tracker ) return 0;
         const active = tracker.getActiveSession();
         if ( ! active ) return 0;
@@ -44,10 +44,10 @@
         if ( ! serverData ) return;
         const live   = liveSessionSec();
         const streak = serverData.streak || 0;
-        setText( 'dct-today',   fmtTime( serverData.today_sec + live ) );
-        setText( 'dct-week',    fmtTime( serverData.week_sec  + live ) );
-        setText( 'dct-alltime', fmtTime( serverData.all_sec   + live ) );
-        setText( 'dct-streak',  streak + ( streak === 1 ? ' day' : ' days' ) );
+        setText( 'bdct-today',   fmtTime( serverData.today_sec + live ) );
+        setText( 'bdct-week',    fmtTime( serverData.week_sec  + live ) );
+        setText( 'bdct-alltime', fmtTime( serverData.all_sec   + live ) );
+        setText( 'bdct-streak',  streak + ( streak === 1 ? ' day' : ' days' ) );
     }
 
     /* ── fetch server data ── */
@@ -56,7 +56,7 @@
         loading = true;
 
         const fd = new FormData();
-        fd.append( 'action', 'dct_get_dashboard' );
+        fd.append( 'action', 'bdct_get_dashboard' );
         fd.append( 'nonce',  cfg.nonce );
 
         fetch( cfg.ajaxUrl, { method: 'POST', body: fd } )
@@ -75,14 +75,14 @@
             } )
             .catch( function () {
                 loading = false;
-                showError( 'dct-recent-body',  5 );
-                showError( 'dct-perpage-body', 5 );
+                showError( 'bdct-recent-body',  5 );
+                showError( 'bdct-perpage-body', 5 );
             } );
     }
 
     /* ── chart ── */
     function renderChart( daily ) {
-        const canvas = document.getElementById( 'dct-chart' );
+        const canvas = document.getElementById( 'bdct-chart' );
         if ( ! canvas ) return;
 
         if ( chartInstance ) {
@@ -92,20 +92,20 @@
 
         if ( ! window.Chart ) {
             canvas.style.display = 'none';
-            const msg = document.getElementById( 'dct-chart-msg' );
+            const msg = document.getElementById( 'bdct-chart-msg' );
             if ( msg ) { msg.textContent = 'Chart.js failed to load.'; msg.style.display = 'block'; }
             return;
         }
 
         if ( ! daily || ! daily.length ) {
             canvas.style.display = 'none';
-            const msg = document.getElementById( 'dct-chart-msg' );
+            const msg = document.getElementById( 'bdct-chart-msg' );
             if ( msg ) { msg.textContent = 'No activity in the last 30 days yet.'; msg.style.display = 'block'; }
             return;
         }
 
         canvas.style.display = '';
-        const msg = document.getElementById( 'dct-chart-msg' );
+        const msg = document.getElementById( 'bdct-chart-msg' );
         if ( msg ) msg.style.display = 'none';
 
         const labels = daily.map( function ( d ) {
@@ -135,7 +135,7 @@
 
     /* ── tables ── */
     function renderRecent( sessions ) {
-        const tbody = document.getElementById( 'dct-recent-body' );
+        const tbody = document.getElementById( 'bdct-recent-body' );
         if ( ! tbody ) return;
         if ( ! sessions || ! sessions.length ) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888">No completed sessions yet — keep browsing wp-admin and come back!</td></tr>';
@@ -153,7 +153,7 @@
     }
 
     function renderPerPage( rows ) {
-        const tbody = document.getElementById( 'dct-perpage-body' );
+        const tbody = document.getElementById( 'bdct-perpage-body' );
         if ( ! tbody ) return;
         if ( ! rows || ! rows.length ) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888">No data yet.</td></tr>';

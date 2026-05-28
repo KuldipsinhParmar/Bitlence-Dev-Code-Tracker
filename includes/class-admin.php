@@ -1,7 +1,7 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-class DCT_Admin {
+class BDCT_Admin {
 
     public static function init(): void {
         add_action( 'admin_menu',            [ __CLASS__, 'register_menu' ] );
@@ -14,107 +14,107 @@ class DCT_Admin {
     }
 
     public static function register_menu(): void {
-        // Top-level sidebar entry.
+        // Top-level sidebar entry — position 85 keeps it below core Settings (80).
         add_menu_page(
-            'Dev Code Tracker',
-            'Dev Code Tracker',
+            __( 'Dev Code Tracker', 'bitlence-dev-code-tracker' ),
+            __( 'Dev Code Tracker', 'bitlence-dev-code-tracker' ),
             'read',
-            'dct',
+            'bdct',
             [ __CLASS__, 'page_dashboard' ],
             'dashicons-clock',
-            25
+            85
         );
 
         // First submenu replaces the parent label with "Dashboard".
-        add_submenu_page( 'dct', 'Dashboard',    'Dashboard',    'read',           'dct',          [ __CLASS__, 'page_dashboard' ] );
-        add_submenu_page( 'dct', 'Sessions Log', 'Sessions Log', 'read',           'dct-sessions', [ __CLASS__, 'page_sessions'  ] );
-        add_submenu_page( 'dct', 'Settings',     'Settings',     'manage_options', 'dct-settings', [ __CLASS__, 'page_settings'  ] );
+        add_submenu_page( 'bdct', __( 'Dashboard', 'bitlence-dev-code-tracker' ),    __( 'Dashboard', 'bitlence-dev-code-tracker' ),    'read',           'bdct',          [ __CLASS__, 'page_dashboard' ] );
+        add_submenu_page( 'bdct', __( 'Sessions Log', 'bitlence-dev-code-tracker' ), __( 'Sessions Log', 'bitlence-dev-code-tracker' ), 'read',           'bdct-sessions', [ __CLASS__, 'page_sessions'  ] );
+        add_submenu_page( 'bdct', __( 'Settings', 'bitlence-dev-code-tracker' ),     __( 'Settings', 'bitlence-dev-code-tracker' ),     'manage_options', 'bdct-settings', [ __CLASS__, 'page_settings'  ] );
     }
 
     public static function register_widget(): void {
         wp_add_dashboard_widget(
-            'dct_today_widget',
-            'Dev Code Tracker — Today',
+            'bdct_today_widget',
+            __( 'Dev Code Tracker — Today', 'bitlence-dev-code-tracker' ),
             [ __CLASS__, 'widget_today' ]
         );
     }
 
     public static function enqueue_scripts( string $hook ): void {
-        // DCT admin pages need the nonce config even when the current user's role isn't tracked
+        // BDCT admin pages need the nonce config even when the current user's role isn't tracked
         // (e.g. an admin who removed 'administrator' from tracked roles still needs to clear data).
-        $on_dct_page = in_array( $hook, [
-            'toplevel_page_dct',
-            'dev-code-tracker_page_dct-sessions',
-            'dev-code-tracker_page_dct-settings',
+        $on_bdct_page = in_array( $hook, [
+            'toplevel_page_bdct',
+            'dev-code-tracker_page_bdct-sessions',
+            'dev-code-tracker_page_bdct-settings',
         ], true );
 
         $config = [
             'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
-            'nonce'         => wp_create_nonce( 'dct_nonce' ),
-            'idleMs'        => DCT_Settings::idle_ms(),
-            'minSessionSec' => DCT_Settings::min_session_sec(),
+            'nonce'         => wp_create_nonce( 'bdct_nonce' ),
+            'idleMs'        => BDCT_Settings::idle_ms(),
+            'minSessionSec' => BDCT_Settings::min_session_sec(),
         ];
 
-        // Always register the handle so dct-dashboard can declare it as a dependency safely.
-        wp_register_script( 'dct-tracker', DCT_PLUGIN_URL . 'assets/tracker.js', [], DCT_VERSION, true );
+        // Always register the handle so bdct-dashboard can declare it as a dependency safely.
+        wp_register_script( 'bdct-tracker', BDCT_PLUGIN_URL . 'assets/tracker.js', [], BDCT_VERSION, true );
 
-        if ( DCT_Settings::is_tracked_role() ) {
+        if ( BDCT_Settings::is_tracked_role() ) {
             // Enqueue tracker.js on every wp-admin screen for tracked roles.
-            wp_enqueue_script( 'dct-tracker' );
-            wp_localize_script( 'dct-tracker', 'dctConfig', $config );
-        } elseif ( $on_dct_page ) {
-            // User can view DCT pages but isn't tracked — inject config for the clear-data button.
-            wp_add_inline_script( 'jquery', 'window.dctConfig=' . wp_json_encode( $config ) . ';' );
+            wp_enqueue_script( 'bdct-tracker' );
+            wp_localize_script( 'bdct-tracker', 'bdctConfig', $config );
+        } elseif ( $on_bdct_page ) {
+            // User can view BDCT pages but isn't tracked — inject config for the clear-data button.
+            wp_add_inline_script( 'jquery', 'window.bdctConfig=' . wp_json_encode( $config ) . ';' );
         }
 
-        // dashboard.js + Chart.js only on the DCT dashboard page (not WP dashboard/index.php).
-        if ( $hook === 'toplevel_page_dct' ) {
+        // dashboard.js + Chart.js only on the BDCT dashboard page (not WP dashboard/index.php).
+        if ( $hook === 'toplevel_page_bdct' ) {
             wp_enqueue_script(
                 'chartjs',
-                DCT_PLUGIN_URL . 'assets/chart.min.js',
+                BDCT_PLUGIN_URL . 'assets/chart.min.js',
                 [],
-                '4.4.9',
+                '4.5.1',
                 true
             );
-            // No dependency on dct-tracker — liveSessionSec() handles window.dctTracker being absent.
+            // No dependency on bdct-tracker — liveSessionSec() handles window.bdctTracker being absent.
             wp_enqueue_script(
-                'dct-dashboard',
-                DCT_PLUGIN_URL . 'assets/dashboard.js',
+                'bdct-dashboard',
+                BDCT_PLUGIN_URL . 'assets/dashboard.js',
                 [ 'chartjs' ],
-                DCT_VERSION,
+                BDCT_VERSION,
                 true
             );
         }
     }
 
     public static function toolbar_item( WP_Admin_Bar $bar ): void {
-        if ( ! is_admin() || ! DCT_Settings::is_tracked_role() ) {
+        if ( ! is_admin() || ! BDCT_Settings::is_tracked_role() ) {
             return;
         }
         $bar->add_node( [
-            'id'    => 'dct-status',
-            'title' => '&#9679; DCT: <span id="dct-toolbar-time">0:00</span>',
-            'href'  => admin_url( 'admin.php?page=dct' ),
-            'meta'  => [ 'class' => 'dct-toolbar-node' ],
+            'id'    => 'bdct-status',
+            'title' => '&#9679; DCT: <span id="bdct-toolbar-time">0:00</span>',
+            'href'  => admin_url( 'admin.php?page=bdct' ),
+            'meta'  => [ 'class' => 'bdct-toolbar-node' ],
         ] );
     }
 
     public static function page_dashboard(): void {
         if ( ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'Not allowed.', 'dev-code-tracker' ) );
+            wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
         }
-        include DCT_PLUGIN_DIR . 'templates/dashboard.php';
+        include BDCT_PLUGIN_DIR . 'templates/dashboard.php';
     }
 
     public static function page_sessions(): void {
         if ( ! current_user_can( 'read' ) ) {
-            wp_die( esc_html__( 'Not allowed.', 'dev-code-tracker' ) );
+            wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
         }
         global $wpdb;
         $sessions = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT s.*, COALESCE(p.post_title, s.admin_page, 'Unknown') AS page_label
-                 FROM {$wpdb->prefix}dct_time_sessions s
+                 FROM {$wpdb->prefix}bdct_time_sessions s
                  LEFT JOIN {$wpdb->prefix}posts p ON p.ID = s.post_id AND s.post_id > 0
                  WHERE s.user_id = %d
                  ORDER BY s.started_at DESC
@@ -125,20 +125,20 @@ class DCT_Admin {
         );
         ?>
         <div class="wrap">
-            <h1>Sessions Log</h1>
+            <h1><?php esc_html_e( 'Sessions Log', 'bitlence-dev-code-tracker' ); ?></h1>
             <table class="widefat striped">
                 <thead>
                     <tr>
-                        <th>Started</th>
-                        <th>Page / Post</th>
-                        <th>Type</th>
-                        <th>Post ID</th>
-                        <th>Duration</th>
+                        <th><?php esc_html_e( 'Started', 'bitlence-dev-code-tracker' ); ?></th>
+                        <th><?php esc_html_e( 'Page / Post', 'bitlence-dev-code-tracker' ); ?></th>
+                        <th><?php esc_html_e( 'Type', 'bitlence-dev-code-tracker' ); ?></th>
+                        <th><?php esc_html_e( 'Post ID', 'bitlence-dev-code-tracker' ); ?></th>
+                        <th><?php esc_html_e( 'Duration', 'bitlence-dev-code-tracker' ); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if ( empty( $sessions ) ) : ?>
-                    <tr><td colspan="5" style="text-align:center;color:#888">No sessions recorded yet.</td></tr>
+                    <tr><td colspan="5" style="text-align:center;color:#888"><?php esc_html_e( 'No sessions recorded yet.', 'bitlence-dev-code-tracker' ); ?></td></tr>
                 <?php else : ?>
                     <?php foreach ( $sessions as $s ) :
                         $sec = (int) $s['duration_sec'];
@@ -166,16 +166,16 @@ class DCT_Admin {
 
     public static function page_settings(): void {
         if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Not allowed.', 'dev-code-tracker' ) );
+            wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
         }
         ?>
         <div class="wrap">
-            <h1>Dev Code Tracker — Settings</h1>
+            <h1><?php esc_html_e( 'Dev Code Tracker — Settings', 'bitlence-dev-code-tracker' ); ?></h1>
             <form method="post" action="options.php">
                 <?php
-                settings_fields( DCT_Settings::OPTION_GROUP );
-                do_settings_sections( DCT_Settings::PAGE );
-                submit_button( 'Save Settings' );
+                settings_fields( BDCT_Settings::OPTION_GROUP );
+                do_settings_sections( BDCT_Settings::PAGE );
+                submit_button( esc_html__( 'Save Settings', 'bitlence-dev-code-tracker' ) );
                 ?>
             </form>
         </div>
@@ -183,24 +183,24 @@ class DCT_Admin {
     }
 
     public static function elementor_editor_footer(): void {
-        if ( ! DCT_Settings::is_tracked_role() ) {
+        if ( ! BDCT_Settings::is_tracked_role() ) {
             return;
         }
         // Skip if wp_footer() already printed tracker.js (some Elementor versions do call it).
         global $wp_scripts;
-        if ( ! empty( $wp_scripts->done ) && in_array( 'dct-tracker', $wp_scripts->done, true ) ) {
+        if ( ! empty( $wp_scripts->done ) && in_array( 'bdct-tracker', $wp_scripts->done, true ) ) {
             return;
         }
         // Output inline — bypasses wp_footer() which Elementor's editor template does not call.
         $config = [
             'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
-            'nonce'         => wp_create_nonce( 'dct_nonce' ),
-            'idleMs'        => DCT_Settings::idle_ms(),
-            'minSessionSec' => DCT_Settings::min_session_sec(),
+            'nonce'         => wp_create_nonce( 'bdct_nonce' ),
+            'idleMs'        => BDCT_Settings::idle_ms(),
+            'minSessionSec' => BDCT_Settings::min_session_sec(),
         ];
-        wp_add_inline_script( 'dct-tracker', 'window.dctConfig=' . wp_json_encode( $config ) . ';', 'before' );
-        wp_enqueue_script( 'dct-tracker' );
-        wp_print_scripts( [ 'dct-tracker' ] );
+        wp_add_inline_script( 'bdct-tracker', 'window.bdctConfig=' . wp_json_encode( $config ) . ';', 'before' );
+        wp_enqueue_script( 'bdct-tracker' );
+        wp_print_scripts( [ 'bdct-tracker' ] );
     }
 
     public static function widget_today(): void {
@@ -208,21 +208,22 @@ class DCT_Admin {
         $today = current_time( 'Y-m-d' );
         $sec   = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}dct_daily_summary
+                "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}bdct_daily_summary
                  WHERE user_id=%d AND summary_date=%s",
                 get_current_user_id(), $today
             )
         );
         if ( $sec === 0 ) {
-            echo '<p style="text-align:center;color:#888;margin:8px 0">No activity yet today.</p>';
+            echo '<p style="text-align:center;color:#888;margin:8px 0">' . esc_html__( 'No activity yet today.', 'bitlence-dev-code-tracker' ) . '</p>';
         } else {
             $h = intdiv( $sec, 3600 );
             $m = intdiv( $sec % 3600, 60 );
             printf( '<p style="font-size:2em;text-align:center;margin:8px 0">%dh %dm</p>', absint( $h ), absint( $m ) );
         }
         printf(
-            '<p style="text-align:center;margin:4px 0 0"><a href="%s">Full Dashboard →</a></p>',
-            esc_url( admin_url( 'admin.php?page=dct' ) )
+            '<p style="text-align:center;margin:4px 0 0"><a href="%s">%s</a></p>',
+            esc_url( admin_url( 'admin.php?page=bdct' ) ),
+            esc_html__( 'Full Dashboard →', 'bitlence-dev-code-tracker' )
         );
     }
 }

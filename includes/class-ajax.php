@@ -1,15 +1,15 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-class DCT_Ajax {
+class BDCT_Ajax {
 
     public static function init(): void {
         $actions = [
-            'dct_save_session'    => 'save_session',
-            'dct_get_dashboard'   => 'get_dashboard',
-            'dct_rename_project'  => 'rename_project',
-            'dct_delete_project'  => 'delete_project',
-            'dct_clear_user_data' => 'clear_user_data',
+            'bdct_save_session'    => 'save_session',
+            'bdct_get_dashboard'   => 'get_dashboard',
+            'bdct_rename_project'  => 'rename_project',
+            'bdct_delete_project'  => 'delete_project',
+            'bdct_clear_user_data' => 'clear_user_data',
         ];
         foreach ( $actions as $action => $method ) {
             add_action( "wp_ajax_{$action}", [ __CLASS__, $method ] );
@@ -17,7 +17,7 @@ class DCT_Ajax {
     }
 
     public static function save_session(): void {
-        check_ajax_referer( 'dct_nonce', 'nonce' );
+        check_ajax_referer( 'bdct_nonce', 'nonce' );
 
         $started_at_utc = sanitize_text_field( wp_unslash( $_POST['started_at'] ?? '' ) );
         $ended_at_utc   = sanitize_text_field( wp_unslash( $_POST['ended_at']   ?? '' ) );
@@ -32,7 +32,7 @@ class DCT_Ajax {
         $duration_sec = min( absint( wp_unslash( $_POST['duration_sec'] ?? 0 ) ), 86400 );
 
         // Enforce server-side minimum (JS also filters, but AJAX is public to logged-in users).
-        if ( $duration_sec < max( 1, DCT_Settings::min_session_sec() ) ) {
+        if ( $duration_sec < max( 1, BDCT_Settings::min_session_sec() ) ) {
             wp_send_json_success( [ 'skipped' => true ] );
         }
 
@@ -47,17 +47,17 @@ class DCT_Ajax {
             'duration_sec' => $duration_sec,
         ];
 
-        $id = DCT_DB::insert_session( $data );
+        $id = BDCT_DB::insert_session( $data );
         $id ? wp_send_json_success( [ 'id' => $id ] ) : wp_send_json_error( 'db_error', 500 );
     }
 
     public static function get_dashboard(): void {
-        check_ajax_referer( 'dct_nonce', 'nonce' );
-        wp_send_json_success( DCT_DB::get_dashboard( get_current_user_id() ) );
+        check_ajax_referer( 'bdct_nonce', 'nonce' );
+        wp_send_json_success( BDCT_DB::get_dashboard( get_current_user_id() ) );
     }
 
     public static function rename_project(): void {
-        check_ajax_referer( 'dct_nonce', 'nonce' );
+        check_ajax_referer( 'bdct_nonce', 'nonce' );
         global $wpdb;
         $id    = absint( $_POST['project_id'] ?? 0 );
         $label = sanitize_text_field( wp_unslash( $_POST['label'] ?? '' ) );
@@ -65,7 +65,7 @@ class DCT_Ajax {
             wp_send_json_error( 'invalid_data', 400 );
         }
         $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-            $wpdb->prefix . 'dct_projects',
+            $wpdb->prefix . 'bdct_projects',
             [ 'label' => $label ],
             [ 'id' => $id, 'user_id' => get_current_user_id() ],
             [ '%s' ], [ '%d', '%d' ]
@@ -74,14 +74,14 @@ class DCT_Ajax {
     }
 
     public static function delete_project(): void {
-        check_ajax_referer( 'dct_nonce', 'nonce' );
+        check_ajax_referer( 'bdct_nonce', 'nonce' );
         global $wpdb;
         $id = absint( $_POST['project_id'] ?? 0 );
         if ( ! $id ) {
             wp_send_json_error( 'invalid_data', 400 );
         }
         $wpdb->delete( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-            $wpdb->prefix . 'dct_projects',
+            $wpdb->prefix . 'bdct_projects',
             [ 'id' => $id, 'user_id' => get_current_user_id() ],
             [ '%d', '%d' ]
         );
@@ -89,8 +89,8 @@ class DCT_Ajax {
     }
 
     public static function clear_user_data(): void {
-        check_ajax_referer( 'dct_nonce', 'nonce' );
-        DCT_DB::delete_user_data( get_current_user_id() );
+        check_ajax_referer( 'bdct_nonce', 'nonce' );
+        BDCT_DB::delete_user_data( get_current_user_id() );
         wp_send_json_success();
     }
 }

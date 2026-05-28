@@ -6,3 +6,9 @@
 
 # Node / npm (if ever used for build tooling)
 node_modules/
+
+# Packaged archives
+*.zip
+
+# Claude Code settings (dev tool, not part of the plugin)
+.claude/

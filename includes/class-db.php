@@ -1,14 +1,14 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-class DCT_DB {
+class BDCT_DB {
 
     public static function install() {
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
-        dbDelta( "CREATE TABLE {$wpdb->prefix}dct_time_sessions (
+        dbDelta( "CREATE TABLE {$wpdb->prefix}bdct_time_sessions (
             id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id       BIGINT UNSIGNED NOT NULL,
             post_id       INT DEFAULT NULL,
@@ -22,7 +22,7 @@ class DCT_DB {
             KEY started_at (started_at)
         ) $charset;" );
 
-        dbDelta( "CREATE TABLE {$wpdb->prefix}dct_daily_summary (
+        dbDelta( "CREATE TABLE {$wpdb->prefix}bdct_daily_summary (
             id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id       BIGINT UNSIGNED NOT NULL,
             summary_date  DATE NOT NULL,
@@ -31,7 +31,7 @@ class DCT_DB {
             UNIQUE KEY user_date (user_id, summary_date)
         ) $charset;" );
 
-        dbDelta( "CREATE TABLE {$wpdb->prefix}dct_projects (
+        dbDelta( "CREATE TABLE {$wpdb->prefix}bdct_projects (
             id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             user_id       BIGINT UNSIGNED NOT NULL,
             label         VARCHAR(255) NOT NULL,
@@ -40,7 +40,7 @@ class DCT_DB {
             KEY user_id (user_id)
         ) $charset;" );
 
-        update_option( 'dct_db_version', DCT_VERSION );
+        update_option( 'bdct_db_version', BDCT_VERSION );
     }
 
     public static function insert_session( array $data ): int|false {
@@ -62,7 +62,7 @@ class DCT_DB {
         }
 
         $result = $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $wpdb->prefix . 'dct_time_sessions',
+            $wpdb->prefix . 'bdct_time_sessions',
             $fields,
             $formats
         );
@@ -81,7 +81,7 @@ class DCT_DB {
         // Avoids both the deprecated VALUES() function and the MySQL 8.0.19+ row-alias syntax.
         $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "INSERT INTO {$wpdb->prefix}dct_daily_summary (user_id, summary_date, total_sec)
+                "INSERT INTO {$wpdb->prefix}bdct_daily_summary (user_id, summary_date, total_sec)
                  VALUES (%d, %s, %d)
                  ON DUPLICATE KEY UPDATE total_sec = total_sec + %d",
                 $user_id, $date, $seconds, $seconds
@@ -96,7 +96,7 @@ class DCT_DB {
 
         $today_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}dct_daily_summary
+                "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}bdct_daily_summary
                  WHERE user_id=%d AND summary_date=%s",
                 $user_id, $today
             )
@@ -104,7 +104,7 @@ class DCT_DB {
 
         $week_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}dct_daily_summary
+                "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}bdct_daily_summary
                  WHERE user_id=%d AND summary_date BETWEEN %s AND %s",
                 $user_id, $week, $today
             )
@@ -112,7 +112,7 @@ class DCT_DB {
 
         $all_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}dct_daily_summary
+                "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}bdct_daily_summary
                  WHERE user_id=%d",
                 $user_id
             )
@@ -121,7 +121,7 @@ class DCT_DB {
         $daily_30 = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT summary_date AS date, total_sec AS seconds
-                 FROM {$wpdb->prefix}dct_daily_summary
+                 FROM {$wpdb->prefix}bdct_daily_summary
                  WHERE user_id=%d AND summary_date >= %s
                  ORDER BY summary_date ASC",
                 $user_id, wp_date( 'Y-m-d', strtotime( '-29 days', strtotime( $today ) ) )
@@ -132,7 +132,7 @@ class DCT_DB {
         $recent = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
                 "SELECT id, post_id, post_type, admin_page, started_at, duration_sec
-                 FROM {$wpdb->prefix}dct_time_sessions
+                 FROM {$wpdb->prefix}bdct_time_sessions
                  WHERE user_id=%d
                  ORDER BY started_at DESC LIMIT 50",
                 $user_id
@@ -146,7 +146,7 @@ class DCT_DB {
                         COALESCE(MAX(p.post_title), s.admin_page, 'Unknown') AS page_label,
                         SUM(s.duration_sec) AS total_sec,
                         COUNT(*) AS sessions
-                 FROM {$wpdb->prefix}dct_time_sessions s
+                 FROM {$wpdb->prefix}bdct_time_sessions s
                  LEFT JOIN {$wpdb->prefix}posts p ON p.ID = s.post_id AND s.post_id > 0
                  WHERE s.user_id=%d
                  GROUP BY s.post_id, s.post_type, s.admin_page
@@ -166,7 +166,7 @@ class DCT_DB {
         global $wpdb;
         $dates = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "SELECT summary_date FROM {$wpdb->prefix}dct_daily_summary
+                "SELECT summary_date FROM {$wpdb->prefix}bdct_daily_summary
                  WHERE user_id = %d AND total_sec > 0
                  ORDER BY summary_date DESC
                  LIMIT 366",
@@ -202,8 +202,8 @@ class DCT_DB {
 
     public static function delete_user_data( int $user_id ): void {
         global $wpdb;
-        $wpdb->delete( $wpdb->prefix . 'dct_time_sessions',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $wpdb->delete( $wpdb->prefix . 'dct_daily_summary',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $wpdb->delete( $wpdb->prefix . 'dct_projects',       [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete( $wpdb->prefix . 'bdct_time_sessions',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete( $wpdb->prefix . 'bdct_daily_summary',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete( $wpdb->prefix . 'bdct_projects',       [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
     }
 }

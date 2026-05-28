@@ -1,30 +1,30 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-class DCT_Settings {
+class BDCT_Settings {
 
-    const OPTION_GROUP = 'dct_settings';
-    const PAGE         = 'dct-settings';
+    const OPTION_GROUP = 'bdct_settings';
+    const PAGE         = 'bdct-settings';
 
     public static function init(): void {
         add_action( 'admin_init', [ __CLASS__, 'register' ] );
     }
 
     public static function register(): void {
-        register_setting( self::OPTION_GROUP, 'dct_idle_timeout',    [ 'type' => 'integer', 'default' => 5,   'sanitize_callback' => 'absint' ] );
-        register_setting( self::OPTION_GROUP, 'dct_min_session_sec', [ 'type' => 'integer', 'default' => 60, 'sanitize_callback' => 'absint' ] );
-        register_setting( self::OPTION_GROUP, 'dct_track_roles',     [ 'type' => 'array',   'default' => [ 'administrator', 'editor' ], 'sanitize_callback' => [ __CLASS__, 'sanitize_roles' ] ] );
+        register_setting( self::OPTION_GROUP, 'bdct_idle_timeout',    [ 'type' => 'integer', 'default' => 5,   'sanitize_callback' => 'absint' ] );
+        register_setting( self::OPTION_GROUP, 'bdct_min_session_sec', [ 'type' => 'integer', 'default' => 60, 'sanitize_callback' => 'absint' ] );
+        register_setting( self::OPTION_GROUP, 'bdct_track_roles',     [ 'type' => 'array',   'default' => [ 'administrator', 'editor' ], 'sanitize_callback' => [ __CLASS__, 'sanitize_roles' ] ] );
 
-        add_settings_section( 'dct_main', 'Tracking', '__return_false', self::PAGE );
+        add_settings_section( 'bdct_main', __( 'Tracking', 'bitlence-dev-code-tracker' ), '__return_false', self::PAGE );
 
-        add_settings_field( 'dct_idle_timeout',    'Idle Timeout (minutes)',   [ __CLASS__, 'field_number' ], self::PAGE, 'dct_main', [ 'option' => 'dct_idle_timeout',    'min' => 1 ] );
-        add_settings_field( 'dct_min_session_sec', 'Min Session Length (sec)', [ __CLASS__, 'field_number' ], self::PAGE, 'dct_main', [ 'option' => 'dct_min_session_sec', 'min' => 0 ] );
-        add_settings_field( 'dct_track_roles',     'Track These Roles',        [ __CLASS__, 'field_roles' ],  self::PAGE, 'dct_main' );
+        add_settings_field( 'bdct_idle_timeout',    __( 'Idle Timeout (minutes)', 'bitlence-dev-code-tracker' ),   [ __CLASS__, 'field_number' ], self::PAGE, 'bdct_main', [ 'option' => 'bdct_idle_timeout',    'min' => 1 ] );
+        add_settings_field( 'bdct_min_session_sec', __( 'Min Session Length (sec)', 'bitlence-dev-code-tracker' ), [ __CLASS__, 'field_number' ], self::PAGE, 'bdct_main', [ 'option' => 'bdct_min_session_sec', 'min' => 0 ] );
+        add_settings_field( 'bdct_track_roles',     __( 'Track These Roles', 'bitlence-dev-code-tracker' ),        [ __CLASS__, 'field_roles' ],  self::PAGE, 'bdct_main' );
     }
 
     private const DEFAULTS = [
-        'dct_idle_timeout'    => 5,
-        'dct_min_session_sec' => 60,
+        'bdct_idle_timeout'    => 5,
+        'bdct_min_session_sec' => 60,
     ];
 
     public static function field_number( array $args ): void {
@@ -36,9 +36,9 @@ class DCT_Settings {
     }
 
     public static function field_roles(): void {
-        $saved = (array) get_option( 'dct_track_roles', [ 'administrator', 'editor' ] );
+        $saved = (array) get_option( 'bdct_track_roles', [ 'administrator', 'editor' ] );
         foreach ( wp_roles()->get_names() as $slug => $name ) {
-            echo '<label><input type="checkbox" name="dct_track_roles[]" value="' . esc_attr( $slug ) . '"'
+            echo '<label><input type="checkbox" name="bdct_track_roles[]" value="' . esc_attr( $slug ) . '"'
                 . checked( in_array( $slug, $saved, true ), true, false )
                 . '> ' . esc_html( translate_user_role( $name ) ) . '</label>&nbsp; ';
         }
@@ -53,16 +53,16 @@ class DCT_Settings {
     }
 
     public static function idle_ms(): int {
-        return (int) get_option( 'dct_idle_timeout', 5 ) * 60 * 1000;
+        return (int) get_option( 'bdct_idle_timeout', 5 ) * 60 * 1000;
     }
 
     public static function min_session_sec(): int {
-        return (int) get_option( 'dct_min_session_sec', 60 );
+        return (int) get_option( 'bdct_min_session_sec', 60 );
     }
 
     public static function is_tracked_role(): bool {
         $user  = wp_get_current_user();
-        $roles = (array) get_option( 'dct_track_roles', [ 'administrator', 'editor' ] );
+        $roles = (array) get_option( 'bdct_track_roles', [ 'administrator', 'editor' ] );
         return (bool) array_intersect( (array) $user->roles, $roles );
     }
 }

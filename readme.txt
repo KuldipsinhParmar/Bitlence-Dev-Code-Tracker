@@ -1,5 +1,5 @@
-=== Dev Code Tracker ===
-Contributors:      kuldipparmar18
+=== Bitlence Dev Code Tracker ===
+Contributors:      kuldip8213
 Tags:              time tracking, developer, admin, productivity, dashboard
 Requires at least: 6.0
 Tested up to:      7.0
@@ -12,7 +12,7 @@ Track time spent in wp-admin per page/post with idle detection, a 30-day chart, 
 
 == Description ==
 
-Dev Code Tracker monitors how much time you spend on each WordPress admin page or post. It ports the VS Code Dev Code Tracker extension logic 1:1 into WordPress.
+Bitlence Dev Code Tracker monitors how much time you spend on each WordPress admin page or post. It tracks developer activity inside wp-admin with idle detection, daily summaries, and per-page breakdowns.
 
 **Features**
 
@@ -38,7 +38,7 @@ Dev Code Tracker monitors how much time you spend on each WordPress admin page o
 
 == Installation ==
 
-1. Upload the `wp-dev-tracker` folder to `/wp-content/plugins/`
+1. Upload the `bitlence-dev-code-tracker` folder to `/wp-content/plugins/` or install directly from the WordPress plugin directory
 2. Activate the plugin via **Plugins → Installed Plugins**
 3. The DB tables are created automatically on activation
 4. Visit **Dev Code Tracker → Dashboard** to see your stats
@@ -68,7 +68,7 @@ Yes — go to **Dev Code Tracker → Settings** and choose which roles are track
 
 = 1.0.0 =
 * Initial release
-* Session tracking with idle detection (port of VS Code extension)
+* Session tracking with idle detection
 * Per-page/post breakdown with post title lookup
 * 30-day bar chart, streak tracker, dashboard widget
 * localStorage pending queue for reliability
