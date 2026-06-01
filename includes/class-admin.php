@@ -4,13 +4,43 @@ defined( 'ABSPATH' ) || exit;
 class BDCT_Admin {
 
     public static function init(): void {
-        add_action( 'admin_menu',            [ __CLASS__, 'register_menu' ] );
-        add_action( 'wp_dashboard_setup',    [ __CLASS__, 'register_widget' ] );
-        add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_scripts' ] );
-        add_action( 'admin_bar_menu',        [ __CLASS__, 'toolbar_item' ], 100 );
-        // Elementor's editor template calls do_action('elementor/editor/footer') instead of
-        // wp_footer(), so footer-queued scripts are never printed. Force-print tracker.js here.
+        add_action( 'admin_menu',              [ __CLASS__, 'register_menu' ] );
+        add_action( 'wp_dashboard_setup',      [ __CLASS__, 'register_widget' ] );
+        add_action( 'admin_enqueue_scripts',   [ __CLASS__, 'enqueue_scripts' ] );
+        add_action( 'wp_enqueue_scripts',      [ __CLASS__, 'frontend_enqueue_scripts' ] );
+        add_action( 'admin_bar_menu',          [ __CLASS__, 'toolbar_item' ], 100 );
+        add_action( 'admin_init',              [ __CLASS__, 'maybe_export_csv' ] );
         add_action( 'elementor/editor/footer', [ __CLASS__, 'elementor_editor_footer' ] );
+    }
+
+    private static function is_frontend_builder(): bool {
+        // phpcs:disable WordPress.Security.NonceVerification.Recommended
+        return isset( $_GET['ct_builder'] )                                               // Oxygen
+            || isset( $_GET['fl_builder'] )                                               // Beaver Builder
+            || isset( $_GET['et_fb'] )                                                    // Divi Visual Builder
+            || ( isset( $_GET['vc_action'] ) && 'vc_inline' === $_GET['vc_action'] )      // WPBakery
+            || isset( $_GET['brizy-edit'] )                                               // Brizy
+            || ( isset( $_GET['tve'] ) && '1' === $_GET['tve'] )                          // Thrive Architect
+            || isset( $_GET['seedprod_page'] );                                           // SeedProd
+        // phpcs:enable WordPress.Security.NonceVerification.Recommended
+    }
+
+    public static function frontend_enqueue_scripts(): void {
+        if ( ! BDCT_Settings::is_tracked_role() || ! self::is_frontend_builder() ) {
+            return;
+        }
+        $config = [
+            'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+            'nonce'         => wp_create_nonce( 'bdct_nonce' ),
+            'idleMs'        => BDCT_Settings::idle_ms(),
+            'minSessionSec' => BDCT_Settings::min_session_sec(),
+            'todaySec'      => BDCT_DB::get_today_sec( get_current_user_id() ),
+            'postId'        => get_the_ID() ?: null,
+            'postType'      => get_post_type() ?: null,
+        ];
+        wp_register_script( 'bdct-tracker', BDCT_PLUGIN_URL . 'assets/tracker.js', [], BDCT_VERSION, true );
+        wp_enqueue_script( 'bdct-tracker' );
+        wp_localize_script( 'bdct-tracker', 'bdctConfig', $config );
     }
 
     public static function register_menu(): void {
@@ -40,60 +70,51 @@ class BDCT_Admin {
     }
 
     public static function enqueue_scripts( string $hook ): void {
-        // BDCT admin pages need the nonce config even when the current user's role isn't tracked
-        // (e.g. an admin who removed 'administrator' from tracked roles still needs to clear data).
         $on_bdct_page = in_array( $hook, [
             'toplevel_page_bdct',
             'dev-code-tracker_page_bdct-sessions',
             'dev-code-tracker_page_bdct-settings',
         ], true );
 
+        if ( $on_bdct_page || BDCT_Settings::is_tracked_role() ) {
+            wp_enqueue_style( 'bdct-admin', BDCT_PLUGIN_URL . 'assets/admin.css', [], BDCT_VERSION );
+        }
+
         $config = [
             'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'bdct_nonce' ),
             'idleMs'        => BDCT_Settings::idle_ms(),
             'minSessionSec' => BDCT_Settings::min_session_sec(),
+            'todaySec'      => BDCT_DB::get_today_sec( get_current_user_id() ),
         ];
 
-        // Always register the handle so bdct-dashboard can declare it as a dependency safely.
         wp_register_script( 'bdct-tracker', BDCT_PLUGIN_URL . 'assets/tracker.js', [], BDCT_VERSION, true );
 
         if ( BDCT_Settings::is_tracked_role() ) {
-            // Enqueue tracker.js on every wp-admin screen for tracked roles.
             wp_enqueue_script( 'bdct-tracker' );
             wp_localize_script( 'bdct-tracker', 'bdctConfig', $config );
         } elseif ( $on_bdct_page ) {
-            // User can view BDCT pages but isn't tracked — inject config for the clear-data button.
             wp_add_inline_script( 'jquery', 'window.bdctConfig=' . wp_json_encode( $config ) . ';' );
         }
 
-        // dashboard.js + Chart.js only on the BDCT dashboard page (not WP dashboard/index.php).
         if ( $hook === 'toplevel_page_bdct' ) {
-            wp_enqueue_script(
-                'chartjs',
-                BDCT_PLUGIN_URL . 'assets/chart.min.js',
-                [],
-                '4.5.1',
-                true
-            );
-            // No dependency on bdct-tracker — liveSessionSec() handles window.bdctTracker being absent.
-            wp_enqueue_script(
-                'bdct-dashboard',
-                BDCT_PLUGIN_URL . 'assets/dashboard.js',
-                [ 'chartjs' ],
-                BDCT_VERSION,
-                true
-            );
+            wp_enqueue_script( 'chartjs', BDCT_PLUGIN_URL . 'assets/chart.min.js', [], '4.5.1', true );
+            wp_enqueue_script( 'bdct-dashboard', BDCT_PLUGIN_URL . 'assets/dashboard.js', [ 'chartjs' ], BDCT_VERSION, true );
+            wp_localize_script( 'bdct-dashboard', 'bdctConfig', $config );
         }
     }
 
     public static function toolbar_item( WP_Admin_Bar $bar ): void {
-        if ( ! is_admin() || ! BDCT_Settings::is_tracked_role() ) {
+        if ( ! BDCT_Settings::is_tracked_role() ) {
+            return;
+        }
+        // On the frontend only show the node when a page builder is active.
+        if ( ! is_admin() && ! self::is_frontend_builder() ) {
             return;
         }
         $bar->add_node( [
             'id'    => 'bdct-status',
-            'title' => '&#9679; DCT: <span id="bdct-toolbar-time">0:00</span>',
+            'title' => '&#9679; DCT<span id="bdct-toolbar-time"></span>',
             'href'  => admin_url( 'admin.php?page=bdct' ),
             'meta'  => [ 'class' => 'bdct-toolbar-node' ],
         ] );
@@ -110,35 +131,102 @@ class BDCT_Admin {
         if ( ! current_user_can( 'read' ) ) {
             wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
         }
-        global $wpdb;
-        $sessions = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-            $wpdb->prepare(
-                "SELECT s.*, COALESCE(p.post_title, s.admin_page, 'Unknown') AS page_label
-                 FROM {$wpdb->prefix}bdct_time_sessions s
-                 LEFT JOIN {$wpdb->prefix}posts p ON p.ID = s.post_id AND s.post_id > 0
-                 WHERE s.user_id = %d
-                 ORDER BY s.started_at DESC
-                 LIMIT 200",
-                get_current_user_id()
-            ),
-            ARRAY_A
-        );
+
+        // phpcs:disable WordPress.Security.NonceVerification.Recommended
+        $date_pattern = '/^\d{4}-\d{2}-\d{2}$/';
+        $from    = sanitize_text_field( wp_unslash( $_GET['bdct_from'] ?? '' ) );
+        $to      = sanitize_text_field( wp_unslash( $_GET['bdct_to']   ?? '' ) );
+        $from    = preg_match( $date_pattern, $from ) ? $from : '';
+        $to      = preg_match( $date_pattern, $to )   ? $to   : '';
+        $orderby = in_array( $_GET['orderby'] ?? '', [ 'started_at', 'duration_sec' ], true )
+                       ? sanitize_key( $_GET['orderby'] )
+                       : 'started_at';
+        $order   = strtoupper( sanitize_text_field( wp_unslash( $_GET['order'] ?? 'DESC' ) ) ) === 'ASC' ? 'ASC' : 'DESC';
+
+        $per_page     = 50;
+        $current_page = max( 1, absint( wp_unslash( $_GET['paged'] ?? 1 ) ) );
+        // phpcs:enable WordPress.Security.NonceVerification.Recommended
+        $offset       = ( $current_page - 1 ) * $per_page;
+        $total        = BDCT_DB::count_sessions( get_current_user_id(), $from, $to );
+        $sessions     = BDCT_DB::get_sessions( get_current_user_id(), $per_page, $offset, $from, $to, $orderby, $order );
+        $export_args  = array_filter( [ 'page' => 'bdct-sessions', 'bdct_export' => 'csv', 'bdct_from' => $from, 'bdct_to' => $to ] );
+        $export_url   = wp_nonce_url( add_query_arg( $export_args, admin_url( 'admin.php' ) ), 'bdct_export_csv' );
+        $total_pages  = (int) ceil( $total / $per_page );
+
+        // Helper: build a sortable column header link.
+        $sort_link = function ( string $label, string $col ) use ( $orderby, $order, $from, $to ) : string {
+            $new_order = ( $orderby === $col && $order === 'DESC' ) ? 'asc' : 'desc';
+            $url       = add_query_arg( array_filter( [
+                'page'     => 'bdct-sessions',
+                'orderby'  => $col,
+                'order'    => $new_order,
+                'bdct_from' => $from,
+                'bdct_to'   => $to,
+            ] ), admin_url( 'admin.php' ) );
+            $arrow = '';
+            if ( $orderby === $col ) {
+                $arrow = $order === 'ASC' ? ' &#9650;' : ' &#9660;';
+            }
+            return '<a href="' . esc_url( $url ) . '">' . esc_html( $label ) . $arrow . '</a>';
+        };
         ?>
         <div class="wrap">
             <h1><?php esc_html_e( 'Sessions Log', 'bitlence-dev-code-tracker' ); ?></h1>
+
+            <!-- Date filter -->
+            <form method="get" class="bdct-filter">
+                <input type="hidden" name="page" value="bdct-sessions">
+                <label for="bdct-from"><?php esc_html_e( 'From', 'bitlence-dev-code-tracker' ); ?></label>
+                <input type="date" id="bdct-from" name="bdct_from" value="<?php echo esc_attr( $from ); ?>" class="regular-text">
+                <label for="bdct-to"><?php esc_html_e( 'To', 'bitlence-dev-code-tracker' ); ?></label>
+                <input type="date" id="bdct-to" name="bdct_to" value="<?php echo esc_attr( $to ); ?>" class="regular-text">
+                <button type="submit" class="button button-primary"><?php esc_html_e( 'Filter', 'bitlence-dev-code-tracker' ); ?></button>
+                <?php if ( $from || $to ) : ?>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=bdct-sessions' ) ); ?>" class="button button-secondary bdct-btn-reset">
+                    <?php esc_html_e( 'Clear Filter', 'bitlence-dev-code-tracker' ); ?>
+                </a>
+                <?php endif; ?>
+            </form>
+
+            <div class="bdct-page-actions">
+                <p class="description">
+                    <?php
+                    printf(
+                        /* translators: %d: total number of recorded sessions */
+                        esc_html__( '%d sessions total. Shows completed sessions — the active session saves when you leave the page.', 'bitlence-dev-code-tracker' ),
+                        absint( $total )
+                    );
+                    ?>
+                </p>
+                <span style="display:flex;gap:8px;align-items:center">
+                    <a href="<?php echo esc_url( add_query_arg( '' ) ); ?>" class="button button-secondary">
+                        <?php esc_html_e( 'Refresh', 'bitlence-dev-code-tracker' ); ?>
+                    </a>
+                    <a href="<?php echo esc_url( $export_url ); ?>" class="button button-primary">
+                        <?php
+                        printf(
+                            /* translators: %d: number of sessions to export */
+                            esc_html__( 'Export CSV (%d)', 'bitlence-dev-code-tracker' ),
+                            absint( $total )
+                        );
+                        ?>
+                    </a>
+                </span>
+            </div>
+
             <table class="widefat striped">
                 <thead>
                     <tr>
-                        <th><?php esc_html_e( 'Started', 'bitlence-dev-code-tracker' ); ?></th>
+                        <th><?php echo $sort_link( __( 'Started', 'bitlence-dev-code-tracker' ), 'started_at' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></th>
                         <th><?php esc_html_e( 'Page / Post', 'bitlence-dev-code-tracker' ); ?></th>
                         <th><?php esc_html_e( 'Type', 'bitlence-dev-code-tracker' ); ?></th>
                         <th><?php esc_html_e( 'Post ID', 'bitlence-dev-code-tracker' ); ?></th>
-                        <th><?php esc_html_e( 'Duration', 'bitlence-dev-code-tracker' ); ?></th>
+                        <th><?php echo $sort_link( __( 'Duration', 'bitlence-dev-code-tracker' ), 'duration_sec' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if ( empty( $sessions ) ) : ?>
-                    <tr><td colspan="5" style="text-align:center;color:#888"><?php esc_html_e( 'No sessions recorded yet.', 'bitlence-dev-code-tracker' ); ?></td></tr>
+                    <tr><td colspan="5" class="bdct-empty"><?php esc_html_e( 'No sessions recorded yet.', 'bitlence-dev-code-tracker' ); ?></td></tr>
                 <?php else : ?>
                     <?php foreach ( $sessions as $s ) :
                         $sec = (int) $s['duration_sec'];
@@ -150,18 +238,111 @@ class BDCT_Admin {
                             : sprintf( '%dm %ds', $m, $s2 );
                     ?>
                     <tr>
-                        <td><?php echo esc_html( wp_date( 'd-m-Y H:i', strtotime( $s['started_at'] ) ) ); ?></td>
-                        <td><?php echo esc_html( $s['page_label'] ); ?></td>
-                        <td><?php echo esc_html( $s['post_type'] ?? '—' ); ?></td>
-                        <td><?php echo $s['post_id'] ? esc_html( $s['post_id'] ) : '—'; ?></td>
+                        <td><?php echo esc_html( wp_date( 'd-m-Y g:i A', strtotime( $s['started_at'] ) ) ); ?></td>
+                        <td>
+                            <?php
+                            $bdct_label    = self::format_label( $s['page_label'], $s['admin_page'] ?? '' );
+                            $bdct_edit_url = ! empty( $s['post_id'] ) ? get_edit_post_link( (int) $s['post_id'] ) : null;
+                            if ( $bdct_edit_url ) {
+                                echo '<a href="' . esc_url( $bdct_edit_url ) . '">' . esc_html( $bdct_label ) . '</a>';
+                            } else {
+                                echo esc_html( $bdct_label );
+                            }
+                            ?>
+                        </td>
+                        <td><?php echo esc_html( $s['post_type'] ?? '-' ); ?></td>
+                        <td><?php echo $s['post_id'] ? esc_html( $s['post_id'] ) : '-'; ?></td>
                         <td><?php echo esc_html( $dur ); ?></td>
                     </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
                 </tbody>
             </table>
+
+            <?php if ( $total_pages > 1 ) : ?>
+            <div class="bdct-pagination">
+                <?php
+                echo paginate_links( [ // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                    'base'    => add_query_arg( 'paged', '%#%' ),
+                    'format'  => '',
+                    'current' => $current_page,
+                    'total'   => $total_pages,
+                ] );
+                ?>
+            </div>
+            <?php endif; ?>
         </div>
         <?php
+    }
+
+    private static function format_label( string $page_label, string $admin_page ): string {
+        static $map = [
+            'bdct'              => 'Dev Code Tracker',
+            'bdct-sessions'     => 'Sessions Log',
+            'bdct-settings'     => 'DCT Settings',
+            'edit'              => 'Posts List',
+            'post'              => 'Post Editor',
+            'upload'            => 'Media Library',
+            'plugins'           => 'Plugins',
+            'themes'            => 'Themes',
+            'options-general'   => 'General Settings',
+            'options-writing'   => 'Writing Settings',
+            'options-reading'   => 'Reading Settings',
+            'options-permalink' => 'Permalinks',
+            'users'             => 'Users',
+            'profile'           => 'Profile',
+            'tools'             => 'Tools',
+            'woocommerce'       => 'WooCommerce',
+        ];
+        // page_label is already a post title when it differs from admin_page slug.
+        if ( $page_label && $page_label !== $admin_page && $page_label !== 'Unknown' ) {
+            return $page_label;
+        }
+        return $map[ $admin_page ] ?? ( $page_label ?: $admin_page ?: 'Unknown' );
+    }
+
+    public static function maybe_export_csv(): void {
+        if ( empty( $_GET['bdct_export'] ) || 'csv' !== $_GET['bdct_export'] ) {
+            return;
+        }
+        if ( ! current_user_can( 'read' ) ) {
+            wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
+        }
+        check_admin_referer( 'bdct_export_csv' );
+
+        $date_pattern = '/^\d{4}-\d{2}-\d{2}$/';
+        $from = sanitize_text_field( wp_unslash( $_GET['bdct_from'] ?? '' ) );
+        $to   = sanitize_text_field( wp_unslash( $_GET['bdct_to']   ?? '' ) );
+        $from = preg_match( $date_pattern, $from ) ? $from : '';
+        $to   = preg_match( $date_pattern, $to )   ? $to   : '';
+
+        $sessions = BDCT_DB::get_sessions( get_current_user_id(), 10000, 0, $from, $to, 'started_at', 'DESC' );
+
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="dev-code-tracker-' . gmdate( 'Y-m-d' ) . '.csv"' );
+        header( 'Pragma: no-cache' );
+
+        $out = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        fputcsv( $out, [ 'Started', 'Page / Post', 'Type', 'Post ID', 'Duration (sec)', 'Duration' ] );
+
+        foreach ( $sessions as $s ) {
+            $sec = (int) $s['duration_sec'];
+            $h   = intdiv( $sec, 3600 );
+            $m   = intdiv( $sec % 3600, 60 );
+            $s2  = $sec % 60;
+            $dur = $h > 0 ? sprintf( '%dh %dm %ds', $h, $m, $s2 ) : sprintf( '%dm %ds', $m, $s2 );
+            fputcsv( $out, [
+                wp_date( 'd-m-Y g:i A', strtotime( $s['started_at'] ) ),
+                $s['page_label'],
+                $s['post_type'] ?? '',
+                $s['post_id'] ?: '',
+                $sec,
+                $dur,
+            ] );
+        }
+
+        fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+        exit;
     }
 
     public static function page_settings(): void {
@@ -178,7 +359,35 @@ class BDCT_Admin {
                 submit_button( esc_html__( 'Save Settings', 'bitlence-dev-code-tracker' ) );
                 ?>
             </form>
+
+            <hr>
+
+            <div class="bdct-section bdct-section--danger" style="margin-top:24px">
+                <h2><?php esc_html_e( 'Danger Zone', 'bitlence-dev-code-tracker' ); ?></h2>
+                <p><?php esc_html_e( 'Permanently deletes all your tracked sessions and daily summaries. This cannot be undone.', 'bitlence-dev-code-tracker' ); ?></p>
+                <button id="bdct-clear-btn" class="button button-link-delete">
+                    <?php esc_html_e( 'Clear My Data', 'bitlence-dev-code-tracker' ) ; ?>
+                </button>
+            </div>
         </div>
+
+        <script>
+        (function () {
+            var btn = document.getElementById( 'bdct-clear-btn' );
+            if ( ! btn ) return;
+            btn.addEventListener( 'click', function () {
+                var cfg = window.bdctConfig || {};
+                if ( ! cfg.ajaxUrl ) { alert( 'Configuration not loaded — please reload the page.' ); return; }
+                if ( ! confirm( '<?php echo esc_js( __( 'Delete all your tracked data? This cannot be undone.', 'bitlence-dev-code-tracker' ) ); ?>' ) ) return;
+                var fd = new FormData();
+                fd.append( 'action', 'bdct_clear_user_data' );
+                fd.append( 'nonce',  cfg.nonce );
+                fetch( cfg.ajaxUrl, { method: 'POST', body: fd } )
+                    .then( function ( r ) { return r.json(); } )
+                    .then( function () { location.reload(); } );
+            } );
+        }());
+        </script>
         <?php
     }
 
@@ -186,21 +395,26 @@ class BDCT_Admin {
         if ( ! BDCT_Settings::is_tracked_role() ) {
             return;
         }
-        // Skip if wp_footer() already printed tracker.js (some Elementor versions do call it).
         global $wp_scripts;
         if ( ! empty( $wp_scripts->done ) && in_array( 'bdct-tracker', $wp_scripts->done, true ) ) {
             return;
         }
-        // Output inline — bypasses wp_footer() which Elementor's editor template does not call.
+        // elementor/editor/footer fires during admin_action_elementor (inside admin_init),
+        // which is BEFORE admin_enqueue_scripts. The script may not be registered yet,
+        // so this method must be fully self-contained.
+        if ( ! wp_script_is( 'bdct-tracker', 'registered' ) ) {
+            wp_register_script( 'bdct-tracker', BDCT_PLUGIN_URL . 'assets/tracker.js', [], BDCT_VERSION, true );
+        }
         $config = [
             'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
             'nonce'         => wp_create_nonce( 'bdct_nonce' ),
             'idleMs'        => BDCT_Settings::idle_ms(),
             'minSessionSec' => BDCT_Settings::min_session_sec(),
+            'todaySec'      => BDCT_DB::get_today_sec( get_current_user_id() ),
         ];
-        wp_add_inline_script( 'bdct-tracker', 'window.bdctConfig=' . wp_json_encode( $config ) . ';', 'before' );
+        wp_localize_script( 'bdct-tracker', 'bdctConfig', $config );
         wp_enqueue_script( 'bdct-tracker' );
-        wp_print_scripts( [ 'bdct-tracker' ] );
+        wp_scripts()->do_items( [ 'bdct-tracker' ], 1 );
     }
 
     public static function widget_today(): void {
@@ -214,14 +428,14 @@ class BDCT_Admin {
             )
         );
         if ( $sec === 0 ) {
-            echo '<p style="text-align:center;color:#888;margin:8px 0">' . esc_html__( 'No activity yet today.', 'bitlence-dev-code-tracker' ) . '</p>';
+            echo '<p class="bdct-empty" style="margin:8px 0">' . esc_html__( 'No activity yet today.', 'bitlence-dev-code-tracker' ) . '</p>';
         } else {
             $h = intdiv( $sec, 3600 );
             $m = intdiv( $sec % 3600, 60 );
-            printf( '<p style="font-size:2em;text-align:center;margin:8px 0">%dh %dm</p>', absint( $h ), absint( $m ) );
+            printf( '<p class="bdct-widget-total">%dh %dm</p>', absint( $h ), absint( $m ) );
         }
         printf(
-            '<p style="text-align:center;margin:4px 0 0"><a href="%s">%s</a></p>',
+            '<p class="bdct-widget-link"><a href="%s">%s</a></p>',
             esc_url( admin_url( 'admin.php?page=bdct' ) ),
             esc_html__( 'Full Dashboard →', 'bitlence-dev-code-tracker' )
         );

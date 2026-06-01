@@ -1,0 +1,133 @@
+/* Bitlence Dev Code Tracker — admin styles */
+
+/* ── Stat cards ── */
+.bdct-cards {
+    display: flex;
+    gap: 16px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.bdct-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 16px 24px;
+    min-width: 140px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+
+.bdct-card-label {
+    font-size: .8em;
+    color: #777;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.bdct-card-value {
+    font-size: 1.8em;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.bdct-streak-risk {
+    font-size: .75em;
+    color: #b32d2e;
+    display: block;
+    margin-top: 2px;
+}
+
+/* ── Content sections ── */
+.bdct-section {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+
+.bdct-section h2 {
+    margin-top: 0;
+    font-size: 1em;
+    color: #1d2327;
+}
+
+.bdct-section--danger h2 {
+    color: #b32d2e;
+}
+
+.bdct-section--danger p {
+    color: #555;
+    margin-top: 0;
+}
+
+/* ── Chart ── */
+#bdct-chart-msg {
+    display: none;
+    text-align: center;
+    color: #888;
+    margin: 20px 0;
+}
+
+/* ── Date filter bar ── */
+.bdct-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.bdct-filter label {
+    font-weight: 600;
+}
+
+.bdct-btn-reset {
+    color: #b32d2e !important;
+    border-color: #b32d2e !important;
+}
+
+.bdct-btn-reset:hover {
+    background: #b32d2e !important;
+    color: #fff !important;
+    border-color: #b32d2e !important;
+}
+
+/* ── Dashboard widget ── */
+.bdct-widget-total {
+    font-size: 2em;
+    text-align: center;
+    margin: 8px 0;
+}
+
+.bdct-widget-link {
+    text-align: center;
+    margin: 4px 0 0;
+}
+
+/* ── Empty / loading states ── */
+.bdct-empty {
+    text-align: center;
+    color: #888;
+}
+
+/* ── Sessions log actions bar ── */
+.bdct-page-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.bdct-page-actions .description {
+    margin: 0;
+}
+
+/* ── Pagination ── */
+.bdct-pagination {
+    margin-top: 12px;
+}

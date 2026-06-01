@@ -31,14 +31,16 @@ class BDCT_DB {
             UNIQUE KEY user_date (user_id, summary_date)
         ) $charset;" );
 
-        dbDelta( "CREATE TABLE {$wpdb->prefix}bdct_projects (
-            id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-            user_id       BIGINT UNSIGNED NOT NULL,
-            label         VARCHAR(255) NOT NULL,
-            created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY user_id (user_id)
-        ) $charset;" );
+        // Projects table was removed in 1.1.0 — drop it for users upgrading from 1.0.0.
+        $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}bdct_projects" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
+
+        // Backfill post_type for sessions saved before server-side resolution was added.
+        $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            "UPDATE {$wpdb->prefix}bdct_time_sessions ts
+             INNER JOIN {$wpdb->prefix}posts p ON p.ID = ts.post_id
+             SET ts.post_type = p.post_type
+             WHERE ts.post_id > 0 AND ( ts.post_type IS NULL OR ts.post_type = '' )"
+        );
 
         update_option( 'bdct_db_version', BDCT_VERSION );
     }
@@ -94,29 +96,22 @@ class BDCT_DB {
         $today = current_time( 'Y-m-d' );
         $week  = wp_date( 'Y-m-d', strtotime( '-6 days', strtotime( $today ) ) );
 
-        $today_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        // Combine today / week / all-time into a single query instead of three.
+        $stats = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}bdct_daily_summary
-                 WHERE user_id=%d AND summary_date=%s",
-                $user_id, $today
-            )
+                "SELECT
+                    COALESCE( SUM( CASE WHEN summary_date = %s THEN total_sec ELSE 0 END ), 0 ) AS today_sec,
+                    COALESCE( SUM( CASE WHEN summary_date BETWEEN %s AND %s THEN total_sec ELSE 0 END ), 0 ) AS week_sec,
+                    COALESCE( SUM( total_sec ), 0 ) AS all_sec
+                 FROM {$wpdb->prefix}bdct_daily_summary
+                 WHERE user_id = %d",
+                $today, $week, $today, $user_id
+            ),
+            ARRAY_A
         );
-
-        $week_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-            $wpdb->prepare(
-                "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}bdct_daily_summary
-                 WHERE user_id=%d AND summary_date BETWEEN %s AND %s",
-                $user_id, $week, $today
-            )
-        );
-
-        $all_sec = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-            $wpdb->prepare(
-                "SELECT COALESCE(SUM(total_sec),0) FROM {$wpdb->prefix}bdct_daily_summary
-                 WHERE user_id=%d",
-                $user_id
-            )
-        );
+        $today_sec = (int) ( $stats['today_sec'] ?? 0 );
+        $week_sec  = (int) ( $stats['week_sec']  ?? 0 );
+        $all_sec   = (int) ( $stats['all_sec']   ?? 0 );
 
         $daily_30 = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
@@ -131,10 +126,12 @@ class BDCT_DB {
 
         $recent = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prepare(
-                "SELECT id, post_id, post_type, admin_page, started_at, duration_sec
-                 FROM {$wpdb->prefix}bdct_time_sessions
-                 WHERE user_id=%d
-                 ORDER BY started_at DESC LIMIT 50",
+                "SELECT s.id, s.post_id, s.post_type, s.admin_page, s.started_at, s.duration_sec,
+                        COALESCE(p.post_title, s.admin_page, 'Unknown') AS page_label
+                 FROM {$wpdb->prefix}bdct_time_sessions s
+                 LEFT JOIN {$wpdb->prefix}posts p ON p.ID = s.post_id AND s.post_id > 0
+                 WHERE s.user_id=%d
+                 ORDER BY s.started_at DESC LIMIT 10",
                 $user_id
             ),
             ARRAY_A
@@ -148,7 +145,7 @@ class BDCT_DB {
                         COUNT(*) AS sessions
                  FROM {$wpdb->prefix}bdct_time_sessions s
                  LEFT JOIN {$wpdb->prefix}posts p ON p.ID = s.post_id AND s.post_id > 0
-                 WHERE s.user_id=%d
+                 WHERE s.user_id = %d
                  GROUP BY s.post_id, s.post_type, s.admin_page
                  ORDER BY total_sec DESC
                  LIMIT 100",
@@ -202,8 +199,62 @@ class BDCT_DB {
 
     public static function delete_user_data( int $user_id ): void {
         global $wpdb;
-        $wpdb->delete( $wpdb->prefix . 'bdct_time_sessions',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $wpdb->delete( $wpdb->prefix . 'bdct_daily_summary',  [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-        $wpdb->delete( $wpdb->prefix . 'bdct_projects',       [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete( $wpdb->prefix . 'bdct_time_sessions', [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $wpdb->delete( $wpdb->prefix . 'bdct_daily_summary', [ 'user_id' => $user_id ], [ '%d' ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+    }
+
+    public static function get_today_sec( int $user_id ): int {
+        global $wpdb;
+        return (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            $wpdb->prepare(
+                "SELECT COALESCE(total_sec,0) FROM {$wpdb->prefix}bdct_daily_summary
+                 WHERE user_id=%d AND summary_date=%s",
+                $user_id, current_time( 'Y-m-d' )
+            )
+        );
+    }
+
+    public static function count_sessions( int $user_id, string $from = '', string $to = '' ): int {
+        global $wpdb;
+        [ $where_sql, $where_args ] = self::sessions_where( $user_id, $from, $to );
+        return (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}bdct_time_sessions WHERE {$where_sql}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+                ...$where_args
+            )
+        );
+    }
+
+    public static function get_sessions( int $user_id, int $limit = 50, int $offset = 0, string $from = '', string $to = '', string $orderby = 'started_at', string $order = 'DESC' ): array {
+        global $wpdb;
+        [ $where_sql, $where_args ] = self::sessions_where( $user_id, $from, $to );
+        $args = array_merge( $where_args, [ $limit, $offset ] );
+
+        // Whitelist column and direction — cannot use placeholders for ORDER BY identifiers.
+        $orderby_col = in_array( $orderby, [ 'started_at', 'duration_sec' ], true ) ? $orderby : 'started_at';
+        $order_dir   = strtoupper( $order ) === 'ASC' ? 'ASC' : 'DESC';
+
+        // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+        return $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $wpdb->prepare(
+                "SELECT s.*, COALESCE(p.post_title, s.admin_page, 'Unknown') AS page_label
+                 FROM {$wpdb->prefix}bdct_time_sessions s
+                 LEFT JOIN {$wpdb->prefix}posts p ON p.ID = s.post_id AND s.post_id > 0
+                 WHERE {$where_sql}
+                 ORDER BY s.{$orderby_col} {$order_dir}
+                 LIMIT %d OFFSET %d",
+                ...$args
+            ),
+            ARRAY_A
+        );
+        // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+    }
+
+    private static function sessions_where( int $user_id, string $from, string $to ): array {
+        $parts = [ 'user_id = %d' ];
+        $args  = [ $user_id ];
+        if ( $from !== '' ) { $parts[] = 'DATE(started_at) >= %s'; $args[] = $from; }
+        if ( $to   !== '' ) { $parts[] = 'DATE(started_at) <= %s'; $args[] = $to;   }
+        return [ implode( ' AND ', $parts ), $args ];
     }
 }

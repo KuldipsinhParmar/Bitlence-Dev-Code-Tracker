@@ -1,17 +1,19 @@
-/* Bitlence Dev Code Tracker — session tracking */
-( function () {
+/* Bitlence Dev Code Tracker - session tracking */
+(function () {
     'use strict';
 
-    const cfg       = window.bdctConfig || {};
-    const idleMs    = cfg.idleMs        || 5 * 60 * 1000;
-    const minSec    = cfg.minSessionSec || 60;
-    const QUEUE_KEY = 'bdct_pending_sessions';
+    const cfg           = window.bdctConfig || {};
+    cfg.todaySec        = parseInt( cfg.todaySec, 10 )  || 0;
+    const idleMs        = parseInt( cfg.idleMs, 10 )    || 5 * 60 * 1000;
+    const minSec        = parseInt( cfg.minSessionSec, 10 ) || 60;
+    const QUEUE_KEY     = 'bdct_pending_sessions';
+    const CHECKPOINT_MS = 30 * 60 * 1000;
 
     let activeSession     = null;
     let lastTouchMs       = 0;
     let iframeKeepAliveId = null;
 
-    /* ── localStorage helpers (safe in private-browsing / restricted contexts) ── */
+    /* localStorage helpers (safe in private-browsing / restricted contexts) */
     function lsGet( key ) {
         try { return localStorage.getItem( key ); } catch ( e ) { return null; }
     }
@@ -22,10 +24,11 @@
         try { localStorage.removeItem( key ); } catch ( e ) {}
     }
 
-    /* ── page identity ── */
+    /* page identity */
     function getPageKey() {
         const params  = new URLSearchParams( location.search );
-        const postId  = params.get( 'post' );
+        // Admin: ?post=ID  |  Frontend builders: cfg.postId passed via wp_localize_script.
+        const postId  = params.get( 'post' ) || cfg.postId || null;
         const page    = params.get( 'page' );
         const pagenow = window.pagenow || null;
         const typenow = window.typenow || null;
@@ -33,8 +36,8 @@
         if ( postId ) {
             return {
                 key:        'post_' + postId,
-                post_id:    postId,
-                post_type:  typenow || pagenow || null,
+                post_id:    String( postId ),
+                post_type:  typenow || pagenow || cfg.postType || null,
                 admin_page: pagenow || null,
             };
         }
@@ -47,7 +50,7 @@
         };
     }
 
-    /* ── session lifecycle ── */
+    /* session lifecycle */
     function startSession() {
         const page    = getPageKey();
         activeSession = Object.assign( {}, page, {
@@ -73,13 +76,14 @@
                 ended_at:     endStr,
                 duration_sec: String( durSec ),
             } );
-            flushQueue( /* useBeacon= */ true );
+            flushQueue( true );
+            cfg.todaySec = ( cfg.todaySec || 0 ) + durSec;
         }
 
         activeSession = null;
     }
 
-    /* ── localStorage pending queue ── */
+    /* localStorage pending queue */
     function enqueue( data ) {
         const q = JSON.parse( lsGet( QUEUE_KEY ) || '[]' );
         q.push( data );
@@ -91,22 +95,21 @@
         const q = JSON.parse( lsGet( QUEUE_KEY ) || '[]' );
         if ( ! q.length ) return;
 
+        // Clear upfront to prevent duplicate sends on concurrent tabs.
+        // Failed fetch items are re-enqueued in the catch handler.
+        lsRemove( QUEUE_KEY );
+
         q.forEach( function ( data ) {
             const payload = buildPayload( data );
-            let sent = false;
             if ( useBeacon && navigator.sendBeacon ) {
-                sent = navigator.sendBeacon( cfg.ajaxUrl, payload );
+                const sent = navigator.sendBeacon( cfg.ajaxUrl, payload );
+                if ( sent ) return; // browser accepted the beacon
+                // beacon rejected - fall back to fetch
             }
-            if ( ! sent ) {
-                // sendBeacon unavailable / returned false — use fetch (best-effort).
-                fetch( cfg.ajaxUrl, { method: 'POST', body: payload } ).catch( function () {
-                    enqueue( data );
-                } );
-            }
+            fetch( cfg.ajaxUrl, { method: 'POST', body: payload } ).catch( function () {
+                enqueue( data ); // re-enqueue only on confirmed network failure
+            } );
         } );
-
-        // Clear queue; any failed items were re-enqueued inside the fetch catch above.
-        lsRemove( QUEUE_KEY );
     }
 
     function buildPayload( data ) {
@@ -117,7 +120,7 @@
         return fd;
     }
 
-    /* ── touch ── */
+    /* touch */
     function touch() {
         if ( ! activeSession ) {
             startSession();
@@ -138,7 +141,7 @@
         updateToolbar();
     }
 
-    /* ── tick ── */
+    /* tick */
     function tick() {
         if ( ! activeSession ) return;
         if ( Date.now() - activeSession.last_activity > idleMs ) {
@@ -148,19 +151,84 @@
         updateToolbar();
     }
 
-    /* ── toolbar ── */
-    function updateToolbar() {
-        const el = document.getElementById( 'bdct-toolbar-time' );
-        if ( ! el || ! activeSession ) return;
-        const sec = Math.round(
-            ( Date.now() - new Date( activeSession.started_at.replace( ' ', 'T' ) + 'Z' ).getTime() ) / 1000
-        );
-        const m = Math.floor( sec / 60 );
-        const s = sec % 60;
-        el.textContent = m + ':' + String( s ).padStart( 2, '0' );
+    /* Hook activity events inside editor iframes (Gutenberg editor-canvas, etc.)
+       blob: iframes are same-origin so contentDocument is accessible, but window.blur
+       never fires for them — we must attach listeners directly to their document. */
+    function hookEditorIframes() {
+        document.querySelectorAll( 'iframe' ).forEach( function ( f ) {
+            try {
+                var doc = f.contentDocument;
+                if ( ! doc || ! doc.body ) return;
+                if ( f._bdctHookedDoc === doc ) return;
+                [ 'mousemove', 'keydown', 'click' ].forEach( function ( e ) {
+                    doc.addEventListener( e, touch, { passive: true } );
+                } );
+                f._bdctHookedDoc = doc;
+            } catch ( e ) { /* cross-origin — skip */ }
+        } );
     }
 
-    /* ── SPA navigation (WooCommerce Analytics, React/Vue-based admin plugins) ── */
+    setInterval( hookEditorIframes, 2000 );
+
+    /* toolbar */
+    function fmtHM( sec ) {
+        var h = Math.floor( sec / 3600 );
+        var m = Math.floor( ( sec % 3600 ) / 60 );
+        var s = sec % 60;
+        if ( h > 0 ) return h + 'h ' + m + 'm';
+        if ( m > 0 ) return m + 'm ' + s + 's';
+        return s + 's';
+    }
+
+    function fmtMS( sec ) {
+        var m = Math.floor( sec / 60 );
+        var s = sec % 60;
+        return m + ':' + String( s ).padStart( 2, '0' );
+    }
+
+    function updateToolbar() {
+        if ( ! activeSession ) return;
+
+        const liveSec  = Math.round(
+            ( Date.now() - new Date( activeSession.started_at.replace( ' ', 'T' ) + 'Z' ).getTime() ) / 1000
+        );
+        const totalSec = ( cfg.todaySec || 0 ) + liveSec;
+        const display  = fmtHM( totalSec ) + ' | ' + fmtMS( liveSec );
+
+        // Admin bar span (may not exist in Elementor — admin bar is hidden there).
+        let el = document.getElementById( 'bdct-toolbar-time' );
+        if ( ! el ) {
+            const link = document.querySelector( '#wp-admin-bar-bdct-status .ab-item' );
+            if ( link ) {
+                el = document.createElement( 'span' );
+                el.id = 'bdct-toolbar-time';
+                link.appendChild( el );
+            }
+        }
+        if ( el ) {
+            el.textContent = ': ' + display;
+        }
+
+        // Floating badge — shown whenever the WP admin bar is hidden.
+        // Covers Elementor, Bricks, Breakdance, and any other builder that hides #wpadminbar.
+        const adminBar = document.getElementById( 'wpadminbar' );
+        const barHidden = ! adminBar || window.getComputedStyle( adminBar ).display === 'none';
+        if ( barHidden ) {
+            let badge = document.getElementById( 'bdct-el-badge' );
+            if ( ! badge ) {
+                badge = document.createElement( 'div' );
+                badge.id = 'bdct-el-badge';
+                badge.style.cssText = 'position:fixed;bottom:20px;right:20px;'
+                    + 'background:#2271b1;color:#fff;padding:5px 12px;'
+                    + 'border-radius:4px;font:12px/1.4 monospace;z-index:99999;'
+                    + 'box-shadow:0 2px 6px rgba(0,0,0,.25);pointer-events:none;';
+                document.body.appendChild( badge );
+            }
+            badge.textContent = display;
+        }
+    }
+
+    /* SPA navigation (WooCommerce Analytics, React/Vue-based admin plugins) */
     function onUrlChange() {
         if ( activeSession && activeSession.key !== getPageKey().key ) {
             endSession();
@@ -186,7 +254,7 @@
     window.addEventListener( 'popstate',   onUrlChange );
     window.addEventListener( 'hashchange', onUrlChange );
 
-    /* ── iframe keep-alive (Elementor, Divi, Beaver Builder, WPBakery, etc.) ── */
+    /* iframe keep-alive (Elementor, Divi, Beaver Builder, WPBakery, etc.) */
     function startIframeKeepAlive() {
         if ( iframeKeepAliveId ) return;
         iframeKeepAliveId = setInterval( function () {
@@ -229,7 +297,7 @@
         }
     } );
 
-    /* ── auto-checkpoint every 5 minutes ── */
+    /* auto-checkpoint every 5 minutes */
     setInterval( function () {
         if ( ! activeSession ) return;
         const elapsed = Math.round(
@@ -239,9 +307,9 @@
             endSession();
             startSession();
         }
-    }, 5 * 60 * 1000 );
+    }, CHECKPOINT_MS );
 
-    /* ── wire up events ── */
+    /* wire up events */
     [ 'mousemove', 'keydown', 'click' ].forEach( function ( e ) {
         document.addEventListener( e, touch, { passive: true } );
     } );
@@ -254,6 +322,6 @@
 
     window.bdctTracker = { getActiveSession: function () { return activeSession; } };
 
-    flushQueue( /* useBeacon= */ false );
-    startSession();
-} () );
+    flushQueue( false );
+    updateToolbar();
+}());

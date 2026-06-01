@@ -12,3 +12,6 @@ node_modules/
 
 # Claude Code settings (dev tool, not part of the plugin)
 .claude/
+
+# Local Docker dev environment
+docker-compose.yml

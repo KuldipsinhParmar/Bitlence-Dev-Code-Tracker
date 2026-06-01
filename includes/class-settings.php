@@ -12,7 +12,7 @@ class BDCT_Settings {
 
     public static function register(): void {
         register_setting( self::OPTION_GROUP, 'bdct_idle_timeout',    [ 'type' => 'integer', 'default' => 5,   'sanitize_callback' => 'absint' ] );
-        register_setting( self::OPTION_GROUP, 'bdct_min_session_sec', [ 'type' => 'integer', 'default' => 60, 'sanitize_callback' => 'absint' ] );
+        register_setting( self::OPTION_GROUP, 'bdct_min_session_sec', [ 'type' => 'integer', 'default' => 30,  'sanitize_callback' => 'absint' ] );
         register_setting( self::OPTION_GROUP, 'bdct_track_roles',     [ 'type' => 'array',   'default' => [ 'administrator', 'editor' ], 'sanitize_callback' => [ __CLASS__, 'sanitize_roles' ] ] );
 
         add_settings_section( 'bdct_main', __( 'Tracking', 'bitlence-dev-code-tracker' ), '__return_false', self::PAGE );
@@ -24,7 +24,7 @@ class BDCT_Settings {
 
     private const DEFAULTS = [
         'bdct_idle_timeout'    => 5,
-        'bdct_min_session_sec' => 60,
+        'bdct_min_session_sec' => 30,
     ];
 
     public static function field_number( array $args ): void {
@@ -57,7 +57,7 @@ class BDCT_Settings {
     }
 
     public static function min_session_sec(): int {
-        return (int) get_option( 'bdct_min_session_sec', 60 );
+        return (int) get_option( 'bdct_min_session_sec', 30 );
     }
 
     public static function is_tracked_role(): bool {
