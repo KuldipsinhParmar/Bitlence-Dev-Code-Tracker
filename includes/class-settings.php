@@ -53,7 +53,7 @@ class BDCT_Settings {
     }
 
     public static function idle_ms(): int {
-        return (int) get_option( 'bdct_idle_timeout', 5 ) * 60 * 1000;
+        return max( 1, (int) get_option( 'bdct_idle_timeout', 5 ) ) * 60 * 1000;
     }
 
     public static function min_session_sec(): int {

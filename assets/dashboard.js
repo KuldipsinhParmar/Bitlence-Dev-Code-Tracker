@@ -263,10 +263,14 @@
     }
 
     /* init */
-    if ( document.readyState === 'loading' ) {
-        document.addEventListener( 'DOMContentLoaded', loadDashboard );
-    } else {
+    function init() {
         loadDashboard();
+    }
+
+    if ( document.readyState === 'loading' ) {
+        document.addEventListener( 'DOMContentLoaded', init );
+    } else {
+        init();
     }
 
     setInterval( tickStats, 1000 );

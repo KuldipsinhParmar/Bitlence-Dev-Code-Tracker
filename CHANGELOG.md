@@ -2,6 +2,37 @@
 
 All notable changes to Dev Code Tracker are documented here.
 
+## [1.4.0] — 2026-08-12
+
+### Added
+- **Team Overview moved to its own admin page** (`Dev Code Tracker → Team Overview`, `bdct-team` slug, `manage_options`) — was a section on the Dashboard in 1.3.0. New `templates/team.php` + dedicated `assets/team.js` (the team-overview JS was extracted out of `dashboard.js`, which no longer loads or executes any team-related code)
+- **Date-range filter + CSV export for Team Overview** — `BDCT_DB::get_team_summary()` now takes optional `$from`/`$to` and adds a `range_sec` column when either is set; new `BDCT_Admin::maybe_export_team_csv()` hooked on `admin_init`, mirroring the existing Sessions Log export pattern (`wp_nonce_url` + `check_admin_referer('bdct_export_team_csv')`)
+- **Sessions Log "User" column is now unconditional** — shown to every viewer (not just admins); the user-filter dropdown and "view all users" capability remain `manage_options`-only for privacy
+- PHPUnit test suite (`composer.json`, `phpunit.xml.dist`, `tests/`) via `wp-phpunit/wp-phpunit` + `johnpbloch/wordpress-core` (composer-only, no SVN/WP-CLI needed) against a real MySQL DB. `DbStreakTest` covers `BDCT_DB::get_streak()` (consecutive days, gaps, zero-second days, per-user isolation); `AjaxSaveSessionTest` covers `BDCT_Ajax::save_session()` (server-side duration recompute/cap, min-session skip, untracked-role rejection, malformed-datetime rejection). See `tests/README.md` for local setup
+
+### Fixed
+- **`BDCT_DB::insert_session()` returned the wrong session ID** — caught by the new test suite. `self::upsert_daily_summary()` runs an `INSERT ... ON DUPLICATE KEY UPDATE` on `bdct_daily_summary` right after the `bdct_time_sessions` insert, which overwrites `$wpdb->insert_id`; the method then returned that (unrelated) id instead of the session's own. Fixed by capturing `$wpdb->insert_id` immediately after the sessions insert, before the daily-summary upsert runs. The `bdct_save_session` AJAX response's `id` field was affected; nothing in the shipped JS currently consumes that id, so this had no visible symptom in the UI, but any future feature (or third-party integration) relying on it would have silently gotten the wrong row
+- **`BDCT_Settings::idle_ms()`** floors the idle-timeout option at 1 minute — `0` could previously be saved, effectively breaking idle detection
+- **Sessions Log filter form** now includes hidden `orderby`/`order` fields, so applying a date/user filter no longer silently resets the current sort column back to `started_at DESC`
+- **`BDCT_DB::get_team_summary()` / `get_tracked_users()`** switched from `INNER JOIN` to `LEFT JOIN` on `$wpdb->users` (carried over from a same-day fix in 1.3.0 development) — a deleted user's historical time still counts toward team totals and still appears in the user filter, consistent with how the Sessions Log already handles deleted users via `COALESCE(..., 'Unknown')`
+
+### Changed
+- Extracted the duplicated `%dh %dm %ds` duration-formatting block (previously copy-pasted in `page_sessions()` and `maybe_export_csv()`) into `BDCT_Admin::format_duration()`, now shared by those two plus the new `maybe_export_team_csv()`
+- `docker-compose.yml`: `db` service now maps port 3306 to host `3311` (needed for PHPUnit, which runs on the host, to reach the test database)
+- Added `.gitattributes` (`export-ignore`) alongside the existing `.distignore`, and a `bin/build.sh` helper that uses `git archive` to produce a clean, dev-tooling-free copy of the plugin. Plugin Check (and any WP.org submission) should always be run against that clean build, never against the raw dev checkout — the dev checkout legitimately contains `composer.json`, `tests/`, `phpunit.xml.dist`, `vendor/`, etc., none of which ship
+- `phpunit.xml.dist`: disabled PHPUnit's result cache (`cacheResult="false"`) so `.phpunit.result.cache` is never written to the working tree
+- `class-db.php`: added `phpcs:disable`/`enable` blocks around `count_sessions()` and `get_team_summary()` for the same `PreparedSQL`/`PreparedSQLPlaceholders` sniffs already suppressed elsewhere in this file — both queries are safe (no user-controlled SQL fragments), but PHPCS's static analysis can't verify that through the conditional `$where_sql`/`$range_select` string-building, same as the pre-existing pattern in `get_sessions()`
+
+## [1.3.0] — 2026-08-12
+
+### Added
+- **Team Overview** on the Dashboard — admin-only (`manage_options`) table showing today/week/all-time totals per user, backed by a new `BDCT_DB::get_team_summary()` query and `bdct_get_team_summary` AJAX action (capability-checked server-side, independent of the personal per-user dashboard data)
+- **User filter + column on the Sessions Log** — admins get a `bdct_user` dropdown (default "All Users") populated from `BDCT_DB::get_tracked_users()`, plus a "User" column showing `display_name` via a `LEFT JOIN` on `$wpdb->users`; CSV export respects the same filter and adds the User column when exporting as an admin
+- **`BDCT_DB::sessions_where()`** now accepts `user_id = 0` to mean "all users" — used by both the Sessions Log table and CSV export; non-admins are always forced server-side to their own `user_id`, ignoring any `bdct_user` query param, so the filter can't be used to view another user's data without `manage_options`
+
+### Fixed
+- **Bricks and Breakdance builder detection** — both were listed in the readme as supported frontend page builders, but `is_frontend_builder()` never checked for their query params (`?bricks`, `?breakdance`), so `frontend_enqueue_scripts()` and the admin-bar toolbar node never activated on those builders' canvases. Detection added for both.
+
 ## [1.2.0] — 2026-06-01
 
 ### Added

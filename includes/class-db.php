@@ -71,8 +71,11 @@ class BDCT_DB {
         if ( false === $result ) {
             return false;
         }
+        // Capture the session's own insert_id before the daily-summary upsert below
+        // overwrites $wpdb->insert_id with its own (unrelated) row id.
+        $session_id = $wpdb->insert_id;
         self::upsert_daily_summary( $data['started_at'], absint( $data['duration_sec'] ) );
-        return $wpdb->insert_id;
+        return $session_id;
     }
 
     private static function upsert_daily_summary( string $started_at, int $seconds ): void {
@@ -217,12 +220,13 @@ class BDCT_DB {
     public static function count_sessions( int $user_id, string $from = '', string $to = '' ): int {
         global $wpdb;
         [ $where_sql, $where_args ] = self::sessions_where( $user_id, $from, $to );
-        return (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}bdct_time_sessions WHERE {$where_sql}", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
-                ...$where_args
-            )
-        );
+        // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+        $sql = "SELECT COUNT(*) FROM {$wpdb->prefix}bdct_time_sessions WHERE {$where_sql}";
+        if ( $where_args ) {
+            $sql = $wpdb->prepare( $sql, ...$where_args );
+        }
+        return (int) $wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
+        // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
     }
 
     public static function get_sessions( int $user_id, int $limit = 50, int $offset = 0, string $from = '', string $to = '', string $orderby = 'started_at', string $order = 'DESC' ): array {
@@ -237,9 +241,11 @@ class BDCT_DB {
         // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
         return $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prepare(
-                "SELECT s.*, COALESCE(p.post_title, s.admin_page, 'Unknown') AS page_label
+                "SELECT s.*, COALESCE(p.post_title, s.admin_page, 'Unknown') AS page_label,
+                        COALESCE(u.display_name, 'Unknown') AS user_name
                  FROM {$wpdb->prefix}bdct_time_sessions s
                  LEFT JOIN {$wpdb->prefix}posts p ON p.ID = s.post_id AND s.post_id > 0
+                 LEFT JOIN {$wpdb->users} u ON u.ID = s.user_id
                  WHERE {$where_sql}
                  ORDER BY s.{$orderby_col} {$order_dir}
                  LIMIT %d OFFSET %d",
@@ -250,11 +256,65 @@ class BDCT_DB {
         // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
     }
 
+    // $user_id = 0 means "all users" — callers must only allow this for capable users (manage_options).
     private static function sessions_where( int $user_id, string $from, string $to ): array {
-        $parts = [ 'user_id = %d' ];
-        $args  = [ $user_id ];
+        $parts = [];
+        $args  = [];
+        if ( $user_id > 0 ) { $parts[] = 'user_id = %d';          $args[] = $user_id; }
         if ( $from !== '' ) { $parts[] = 'DATE(started_at) >= %s'; $args[] = $from; }
         if ( $to   !== '' ) { $parts[] = 'DATE(started_at) <= %s'; $args[] = $to;   }
+        if ( empty( $parts ) ) { $parts[] = '1=1'; }
         return [ implode( ' AND ', $parts ), $args ];
+    }
+
+    /**
+     * Per-user totals (today / week / all-time, plus an optional date-range total) for every
+     * user with tracked data. Admin-only "team overview" — caller must enforce the capability check.
+     */
+    public static function get_team_summary( string $from = '', string $to = '' ): array {
+        global $wpdb;
+        $today = current_time( 'Y-m-d' );
+        $week  = wp_date( 'Y-m-d', strtotime( '-6 days', strtotime( $today ) ) );
+
+        $range_select = '';
+        $range_args   = [];
+        if ( $from !== '' || $to !== '' ) {
+            $range_select = ', COALESCE( SUM( CASE WHEN ds.summary_date BETWEEN %s AND %s THEN ds.total_sec ELSE 0 END ), 0 ) AS range_sec';
+            $range_args   = [ $from !== '' ? $from : '1970-01-01', $to !== '' ? $to : $today ];
+        }
+
+        // LEFT JOIN — a deleted user's historical time must still count toward team totals
+        // (their sessions remain in the Sessions Log too, labeled "Unknown" the same way).
+        // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+        return $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter
+            $wpdb->prepare(
+                "SELECT ds.user_id,
+                        COALESCE( u.display_name, CONCAT( 'Unknown (#', ds.user_id, ')' ) ) AS display_name,
+                        COALESCE( SUM( CASE WHEN ds.summary_date = %s THEN ds.total_sec ELSE 0 END ), 0 ) AS today_sec,
+                        COALESCE( SUM( CASE WHEN ds.summary_date BETWEEN %s AND %s THEN ds.total_sec ELSE 0 END ), 0 ) AS week_sec,
+                        COALESCE( SUM( ds.total_sec ), 0 ) AS all_sec
+                        {$range_select}
+                 FROM {$wpdb->prefix}bdct_daily_summary ds
+                 LEFT JOIN {$wpdb->users} u ON u.ID = ds.user_id
+                 GROUP BY ds.user_id, u.display_name
+                 ORDER BY all_sec DESC",
+                ...array_merge( [ $today, $week, $today ], $range_args )
+            ),
+            ARRAY_A
+        );
+        // phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+    }
+
+    /** Users who have at least one tracked session — for the Sessions Log user filter. */
+    public static function get_tracked_users(): array {
+        global $wpdb;
+        return $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            "SELECT DISTINCT s.user_id,
+                    COALESCE( u.display_name, CONCAT( 'Unknown (#', s.user_id, ')' ) ) AS display_name
+             FROM {$wpdb->prefix}bdct_time_sessions s
+             LEFT JOIN {$wpdb->users} u ON u.ID = s.user_id
+             ORDER BY display_name ASC",
+            ARRAY_A
+        );
     }
 }

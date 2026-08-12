@@ -10,6 +10,7 @@ class BDCT_Admin {
         add_action( 'wp_enqueue_scripts',      [ __CLASS__, 'frontend_enqueue_scripts' ] );
         add_action( 'admin_bar_menu',          [ __CLASS__, 'toolbar_item' ], 100 );
         add_action( 'admin_init',              [ __CLASS__, 'maybe_export_csv' ] );
+        add_action( 'admin_init',              [ __CLASS__, 'maybe_export_team_csv' ] );
         add_action( 'elementor/editor/footer', [ __CLASS__, 'elementor_editor_footer' ] );
     }
 
@@ -21,7 +22,9 @@ class BDCT_Admin {
             || ( isset( $_GET['vc_action'] ) && 'vc_inline' === $_GET['vc_action'] )      // WPBakery
             || isset( $_GET['brizy-edit'] )                                               // Brizy
             || ( isset( $_GET['tve'] ) && '1' === $_GET['tve'] )                          // Thrive Architect
-            || isset( $_GET['seedprod_page'] );                                           // SeedProd
+            || isset( $_GET['seedprod_page'] )                                            // SeedProd
+            || isset( $_GET['bricks'] )                                                   // Bricks
+            || isset( $_GET['breakdance'] );                                              // Breakdance
         // phpcs:enable WordPress.Security.NonceVerification.Recommended
     }
 
@@ -56,9 +59,10 @@ class BDCT_Admin {
         );
 
         // First submenu replaces the parent label with "Dashboard".
-        add_submenu_page( 'bdct', __( 'Dashboard', 'bitlence-dev-code-tracker' ),    __( 'Dashboard', 'bitlence-dev-code-tracker' ),    'read',           'bdct',          [ __CLASS__, 'page_dashboard' ] );
-        add_submenu_page( 'bdct', __( 'Sessions Log', 'bitlence-dev-code-tracker' ), __( 'Sessions Log', 'bitlence-dev-code-tracker' ), 'read',           'bdct-sessions', [ __CLASS__, 'page_sessions'  ] );
-        add_submenu_page( 'bdct', __( 'Settings', 'bitlence-dev-code-tracker' ),     __( 'Settings', 'bitlence-dev-code-tracker' ),     'manage_options', 'bdct-settings', [ __CLASS__, 'page_settings'  ] );
+        add_submenu_page( 'bdct', __( 'Dashboard', 'bitlence-dev-code-tracker' ),      __( 'Dashboard', 'bitlence-dev-code-tracker' ),      'read',           'bdct',          [ __CLASS__, 'page_dashboard' ] );
+        add_submenu_page( 'bdct', __( 'Sessions Log', 'bitlence-dev-code-tracker' ),   __( 'Sessions Log', 'bitlence-dev-code-tracker' ),   'read',           'bdct-sessions', [ __CLASS__, 'page_sessions'  ] );
+        add_submenu_page( 'bdct', __( 'Team Overview', 'bitlence-dev-code-tracker' ),  __( 'Team Overview', 'bitlence-dev-code-tracker' ),  'manage_options', 'bdct-team',     [ __CLASS__, 'page_team'      ] );
+        add_submenu_page( 'bdct', __( 'Settings', 'bitlence-dev-code-tracker' ),       __( 'Settings', 'bitlence-dev-code-tracker' ),       'manage_options', 'bdct-settings', [ __CLASS__, 'page_settings'  ] );
     }
 
     public static function register_widget(): void {
@@ -73,6 +77,7 @@ class BDCT_Admin {
         $on_bdct_page = in_array( $hook, [
             'toplevel_page_bdct',
             'dev-code-tracker_page_bdct-sessions',
+            'dev-code-tracker_page_bdct-team',
             'dev-code-tracker_page_bdct-settings',
         ], true );
 
@@ -102,6 +107,11 @@ class BDCT_Admin {
             wp_enqueue_script( 'bdct-dashboard', BDCT_PLUGIN_URL . 'assets/dashboard.js', [ 'chartjs' ], BDCT_VERSION, true );
             wp_localize_script( 'bdct-dashboard', 'bdctConfig', $config );
         }
+
+        if ( $hook === 'dev-code-tracker_page_bdct-team' ) {
+            wp_enqueue_script( 'bdct-team', BDCT_PLUGIN_URL . 'assets/team.js', [], BDCT_VERSION, true );
+            wp_localize_script( 'bdct-team', 'bdctConfig', $config );
+        }
     }
 
     public static function toolbar_item( WP_Admin_Bar $bar ): void {
@@ -127,10 +137,21 @@ class BDCT_Admin {
         include BDCT_PLUGIN_DIR . 'templates/dashboard.php';
     }
 
+    public static function page_team(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
+        }
+        include BDCT_PLUGIN_DIR . 'templates/team.php';
+    }
+
     public static function page_sessions(): void {
         if ( ! current_user_can( 'read' ) ) {
             wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
         }
+
+        // Only admins may view other users' sessions. Everyone else is always locked to their own —
+        // this ignores bdct_user entirely for non-admins so it can't be tampered with via the URL.
+        $is_team_viewer = current_user_can( 'manage_options' );
 
         // phpcs:disable WordPress.Security.NonceVerification.Recommended
         $date_pattern = '/^\d{4}-\d{2}-\d{2}$/';
@@ -143,25 +164,30 @@ class BDCT_Admin {
                        : 'started_at';
         $order   = strtoupper( sanitize_text_field( wp_unslash( $_GET['order'] ?? 'DESC' ) ) ) === 'ASC' ? 'ASC' : 'DESC';
 
+        // filter_user_id: 0 = all users (team viewers only, default view). Non-admins are always forced to "me".
+        $filter_user_id = $is_team_viewer ? absint( wp_unslash( $_GET['bdct_user'] ?? 0 ) ) : get_current_user_id();
+
         $per_page     = 50;
         $current_page = max( 1, absint( wp_unslash( $_GET['paged'] ?? 1 ) ) );
         // phpcs:enable WordPress.Security.NonceVerification.Recommended
         $offset       = ( $current_page - 1 ) * $per_page;
-        $total        = BDCT_DB::count_sessions( get_current_user_id(), $from, $to );
-        $sessions     = BDCT_DB::get_sessions( get_current_user_id(), $per_page, $offset, $from, $to, $orderby, $order );
-        $export_args  = array_filter( [ 'page' => 'bdct-sessions', 'bdct_export' => 'csv', 'bdct_from' => $from, 'bdct_to' => $to ] );
+        $total        = BDCT_DB::count_sessions( $filter_user_id, $from, $to );
+        $sessions     = BDCT_DB::get_sessions( $filter_user_id, $per_page, $offset, $from, $to, $orderby, $order );
+        $tracked_users = $is_team_viewer ? BDCT_DB::get_tracked_users() : [];
+        $export_args  = array_filter( [ 'page' => 'bdct-sessions', 'bdct_export' => 'csv', 'bdct_from' => $from, 'bdct_to' => $to, 'bdct_user' => $is_team_viewer ? ( $filter_user_id ?: null ) : null ] );
         $export_url   = wp_nonce_url( add_query_arg( $export_args, admin_url( 'admin.php' ) ), 'bdct_export_csv' );
         $total_pages  = (int) ceil( $total / $per_page );
 
         // Helper: build a sortable column header link.
-        $sort_link = function ( string $label, string $col ) use ( $orderby, $order, $from, $to ) : string {
+        $sort_link = function ( string $label, string $col ) use ( $orderby, $order, $from, $to, $filter_user_id, $is_team_viewer ) : string {
             $new_order = ( $orderby === $col && $order === 'DESC' ) ? 'asc' : 'desc';
             $url       = add_query_arg( array_filter( [
-                'page'     => 'bdct-sessions',
-                'orderby'  => $col,
-                'order'    => $new_order,
+                'page'      => 'bdct-sessions',
+                'orderby'   => $col,
+                'order'     => $new_order,
                 'bdct_from' => $from,
                 'bdct_to'   => $to,
+                'bdct_user' => $is_team_viewer ? ( $filter_user_id ?: null ) : null,
             ] ), admin_url( 'admin.php' ) );
             $arrow = '';
             if ( $orderby === $col ) {
@@ -173,15 +199,28 @@ class BDCT_Admin {
         <div class="wrap">
             <h1><?php esc_html_e( 'Sessions Log', 'bitlence-dev-code-tracker' ); ?></h1>
 
-            <!-- Date filter -->
+            <!-- Date / user filter -->
             <form method="get" class="bdct-filter">
                 <input type="hidden" name="page" value="bdct-sessions">
+                <input type="hidden" name="orderby" value="<?php echo esc_attr( $orderby ); ?>">
+                <input type="hidden" name="order" value="<?php echo esc_attr( $order ); ?>">
                 <label for="bdct-from"><?php esc_html_e( 'From', 'bitlence-dev-code-tracker' ); ?></label>
                 <input type="date" id="bdct-from" name="bdct_from" value="<?php echo esc_attr( $from ); ?>" class="regular-text">
                 <label for="bdct-to"><?php esc_html_e( 'To', 'bitlence-dev-code-tracker' ); ?></label>
                 <input type="date" id="bdct-to" name="bdct_to" value="<?php echo esc_attr( $to ); ?>" class="regular-text">
+                <?php if ( $is_team_viewer ) : ?>
+                <label for="bdct-user"><?php esc_html_e( 'User', 'bitlence-dev-code-tracker' ); ?></label>
+                <select id="bdct-user" name="bdct_user">
+                    <option value="0"><?php esc_html_e( 'All Users', 'bitlence-dev-code-tracker' ); ?></option>
+                    <?php foreach ( $tracked_users as $u ) : ?>
+                    <option value="<?php echo esc_attr( $u['user_id'] ); ?>" <?php selected( $filter_user_id, (int) $u['user_id'] ); ?>>
+                        <?php echo esc_html( $u['display_name'] ); ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php endif; ?>
                 <button type="submit" class="button button-primary"><?php esc_html_e( 'Filter', 'bitlence-dev-code-tracker' ); ?></button>
-                <?php if ( $from || $to ) : ?>
+                <?php if ( $from || $to || ( $is_team_viewer && $filter_user_id ) ) : ?>
                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=bdct-sessions' ) ); ?>" class="button button-secondary bdct-btn-reset">
                     <?php esc_html_e( 'Clear Filter', 'bitlence-dev-code-tracker' ); ?>
                 </a>
@@ -218,6 +257,7 @@ class BDCT_Admin {
                 <thead>
                     <tr>
                         <th><?php echo $sort_link( __( 'Started', 'bitlence-dev-code-tracker' ), 'started_at' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></th>
+                        <th><?php esc_html_e( 'User', 'bitlence-dev-code-tracker' ); ?></th>
                         <th><?php esc_html_e( 'Page / Post', 'bitlence-dev-code-tracker' ); ?></th>
                         <th><?php esc_html_e( 'Type', 'bitlence-dev-code-tracker' ); ?></th>
                         <th><?php esc_html_e( 'Post ID', 'bitlence-dev-code-tracker' ); ?></th>
@@ -226,19 +266,12 @@ class BDCT_Admin {
                 </thead>
                 <tbody>
                 <?php if ( empty( $sessions ) ) : ?>
-                    <tr><td colspan="5" class="bdct-empty"><?php esc_html_e( 'No sessions recorded yet.', 'bitlence-dev-code-tracker' ); ?></td></tr>
+                    <tr><td colspan="6" class="bdct-empty"><?php esc_html_e( 'No sessions recorded yet.', 'bitlence-dev-code-tracker' ); ?></td></tr>
                 <?php else : ?>
-                    <?php foreach ( $sessions as $s ) :
-                        $sec = (int) $s['duration_sec'];
-                        $h   = intdiv( $sec, 3600 );
-                        $m   = intdiv( $sec % 3600, 60 );
-                        $s2  = $sec % 60;
-                        $dur = $h > 0
-                            ? sprintf( '%dh %dm %ds', $h, $m, $s2 )
-                            : sprintf( '%dm %ds', $m, $s2 );
-                    ?>
+                    <?php foreach ( $sessions as $s ) : $dur = self::format_duration( (int) $s['duration_sec'] ); ?>
                     <tr>
                         <td><?php echo esc_html( wp_date( 'd-m-Y g:i A', strtotime( $s['started_at'] ) ) ); ?></td>
+                        <td><?php echo esc_html( $s['user_name'] ?? '-' ); ?></td>
                         <td>
                             <?php
                             $bdct_label    = self::format_label( $s['page_label'], $s['admin_page'] ?? '' );
@@ -301,6 +334,15 @@ class BDCT_Admin {
         return $map[ $admin_page ] ?? ( $page_label ?: $admin_page ?: 'Unknown' );
     }
 
+    private static function format_duration( int $sec ): string {
+        $h  = intdiv( $sec, 3600 );
+        $m  = intdiv( $sec % 3600, 60 );
+        $s2 = $sec % 60;
+        return $h > 0
+            ? sprintf( '%dh %dm %ds', $h, $m, $s2 )
+            : sprintf( '%dm %ds', $m, $s2 );
+    }
+
     public static function maybe_export_csv(): void {
         if ( empty( $_GET['bdct_export'] ) || 'csv' !== $_GET['bdct_export'] ) {
             return;
@@ -310,35 +352,84 @@ class BDCT_Admin {
         }
         check_admin_referer( 'bdct_export_csv' );
 
+        $is_team_viewer = current_user_can( 'manage_options' );
+
         $date_pattern = '/^\d{4}-\d{2}-\d{2}$/';
         $from = sanitize_text_field( wp_unslash( $_GET['bdct_from'] ?? '' ) );
         $to   = sanitize_text_field( wp_unslash( $_GET['bdct_to']   ?? '' ) );
         $from = preg_match( $date_pattern, $from ) ? $from : '';
         $to   = preg_match( $date_pattern, $to )   ? $to   : '';
 
-        $sessions = BDCT_DB::get_sessions( get_current_user_id(), 10000, 0, $from, $to, 'started_at', 'DESC' );
+        $filter_user_id = $is_team_viewer ? absint( wp_unslash( $_GET['bdct_user'] ?? 0 ) ) : get_current_user_id();
+
+        $sessions = BDCT_DB::get_sessions( $filter_user_id, 10000, 0, $from, $to, 'started_at', 'DESC' );
 
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename="dev-code-tracker-' . gmdate( 'Y-m-d' ) . '.csv"' );
         header( 'Pragma: no-cache' );
 
-        $out = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
-        fputcsv( $out, [ 'Started', 'Page / Post', 'Type', 'Post ID', 'Duration (sec)', 'Duration' ] );
+        $out    = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        $header = [ 'Started', 'User', 'Page / Post', 'Type', 'Post ID', 'Duration (sec)', 'Duration' ];
+        fputcsv( $out, $header );
 
         foreach ( $sessions as $s ) {
             $sec = (int) $s['duration_sec'];
-            $h   = intdiv( $sec, 3600 );
-            $m   = intdiv( $sec % 3600, 60 );
-            $s2  = $sec % 60;
-            $dur = $h > 0 ? sprintf( '%dh %dm %ds', $h, $m, $s2 ) : sprintf( '%dm %ds', $m, $s2 );
-            fputcsv( $out, [
-                wp_date( 'd-m-Y g:i A', strtotime( $s['started_at'] ) ),
+            $row = [ wp_date( 'd-m-Y g:i A', strtotime( $s['started_at'] ) ), $s['user_name'] ?? '' ];
+            array_push(
+                $row,
                 $s['page_label'],
                 $s['post_type'] ?? '',
                 $s['post_id'] ?: '',
                 $sec,
-                $dur,
-            ] );
+                self::format_duration( $sec )
+            );
+            fputcsv( $out, $row );
+        }
+
+        fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+        exit;
+    }
+
+    public static function maybe_export_team_csv(): void {
+        if ( empty( $_GET['bdct_export'] ) || 'team_csv' !== $_GET['bdct_export'] ) {
+            return;
+        }
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
+        }
+        check_admin_referer( 'bdct_export_team_csv' );
+
+        $date_pattern = '/^\d{4}-\d{2}-\d{2}$/';
+        $from = sanitize_text_field( wp_unslash( $_GET['bdct_from'] ?? '' ) );
+        $to   = sanitize_text_field( wp_unslash( $_GET['bdct_to']   ?? '' ) );
+        $from = preg_match( $date_pattern, $from ) ? $from : '';
+        $to   = preg_match( $date_pattern, $to )   ? $to   : '';
+        $has_range = ( $from !== '' || $to !== '' );
+
+        $rows = BDCT_DB::get_team_summary( $from, $to );
+
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename="dev-code-tracker-team-' . gmdate( 'Y-m-d' ) . '.csv"' );
+        header( 'Pragma: no-cache' );
+
+        $out    = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        $header = [ 'User', 'Today', 'This Week', 'All Time' ];
+        if ( $has_range ) {
+            $header[] = 'Selected Range';
+        }
+        fputcsv( $out, $header );
+
+        foreach ( $rows as $r ) {
+            $row = [
+                $r['display_name'],
+                self::format_duration( (int) $r['today_sec'] ),
+                self::format_duration( (int) $r['week_sec'] ),
+                self::format_duration( (int) $r['all_sec'] ),
+            ];
+            if ( $has_range ) {
+                $row[] = self::format_duration( (int) ( $r['range_sec'] ?? 0 ) );
+            }
+            fputcsv( $out, $row );
         }
 
         fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose

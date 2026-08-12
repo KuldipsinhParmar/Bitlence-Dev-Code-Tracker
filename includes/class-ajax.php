@@ -5,9 +5,10 @@ class BDCT_Ajax {
 
     public static function init(): void {
         $actions = [
-            'bdct_save_session'    => 'save_session',
-            'bdct_get_dashboard'   => 'get_dashboard',
-            'bdct_clear_user_data' => 'clear_user_data',
+            'bdct_save_session'     => 'save_session',
+            'bdct_get_dashboard'    => 'get_dashboard',
+            'bdct_clear_user_data'  => 'clear_user_data',
+            'bdct_get_team_summary' => 'get_team_summary',
         ];
         foreach ( $actions as $action => $method ) {
             add_action( "wp_ajax_{$action}", [ __CLASS__, $method ] );
@@ -73,5 +74,21 @@ class BDCT_Ajax {
         check_ajax_referer( 'bdct_nonce', 'nonce' );
         BDCT_DB::delete_user_data( get_current_user_id() );
         wp_send_json_success();
+    }
+
+    // Team-wide per-user totals — admin only, so teammates on the same site are visible to whoever manages it.
+    public static function get_team_summary(): void {
+        check_ajax_referer( 'bdct_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'forbidden', 403 );
+        }
+
+        $date_pattern = '/^\d{4}-\d{2}-\d{2}$/';
+        $from = sanitize_text_field( wp_unslash( $_POST['from'] ?? '' ) );
+        $to   = sanitize_text_field( wp_unslash( $_POST['to']   ?? '' ) );
+        $from = preg_match( $date_pattern, $from ) ? $from : '';
+        $to   = preg_match( $date_pattern, $to )   ? $to   : '';
+
+        wp_send_json_success( BDCT_DB::get_team_summary( $from, $to ) );
     }
 }

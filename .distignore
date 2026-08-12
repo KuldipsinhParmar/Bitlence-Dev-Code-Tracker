@@ -1,0 +1,19 @@
+# Excluded from the WP.org SVN/ZIP package — dev-only tooling, not needed to run the plugin.
+.git
+.gitattributes
+.gitignore
+.distignore
+.devCodeTracker
+.claude
+docker-compose.yml
+composer.json
+composer.lock
+phpunit.xml.dist
+tests
+bin
+vendor
+node_modules
+*.zip
+.DS_Store
+.phpunit.result.cache
+build
