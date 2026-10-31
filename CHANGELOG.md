@@ -2,6 +2,13 @@
 
 All notable changes to Dev Code Tracker are documented here.
 
+## [1.4.1] — 2026-10-31
+
+### Changed
+- **New logo** — `assets/logo.png` replaced and `assets/logo.svg` added, matching bitlence.com; WP.org icons added as `assets/icon-128x128.png` and `assets/icon-256x256.png`. The admin menu now shows the logo mark instead of `dashicons-clock`
+- **Bitlence brand colours** — plugin pages, the dashboard widget, the 30-day chart and the live badge now use the bitlence.com palette (`#0066ff`) instead of WordPress default blue
+- Plugin URI and Author URI now point to bitlence.com
+
 ## [1.4.0] — 2026-08-12
 
 ### Added

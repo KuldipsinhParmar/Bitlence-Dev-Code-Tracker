@@ -3,6 +3,12 @@ defined( 'ABSPATH' ) || exit;
 
 class BDCT_Admin {
 
+    /**
+     * Sidebar icon: single-colour version of assets/logo.svg. Fills only, because WordPress
+     * recolours menu SVGs to match the admin colour scheme by rewriting their fill attribute.
+     */
+    private const MENU_ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cGF0aCBmaWxsPSJibGFjayIgZmlsbC1ydWxlPSJldmVub2RkIiBkPSJNMjQ0IDE5LjJBMjQgMjQgMCAwIDEgMjY4IDE5LjJMNDU1IDEyNy4yQTI0IDI0IDAgMCAxIDQ2NyAxNDhMNDY3IDM2NEEyNCAyNCAwIDAgMSA0NTUgMzg0LjhMMjY4IDQ5Mi44QTI0IDI0IDAgMCAxIDI0NCA0OTIuOEw1NyAzODQuOEEyNCAyNCAwIDAgMSA0NSAzNjRMNDUgMTQ4QTI0IDI0IDAgMCAxIDU3IDEyNy4yWk0xNzUuNyAxODIuNEwxMTcuNSAyNTZMMTc1LjcgMzI5LjZBMjAgMjAgMCAwIDEgMTQ0LjMgMzU0LjRMNzYuMyAyNjguNEEyMCAyMCAwIDAgMSA3Ni4zIDI0My42TDE0NC4zIDE1Ny42QTIwIDIwIDAgMCAxIDE3NS43IDE4Mi40Wk0zNjcuNyAxNTcuNkw0MzUuNyAyNDMuNkEyMCAyMCAwIDAgMSA0MzUuNyAyNjguNEwzNjcuNyAzNTQuNEEyMCAyMCAwIDAgMSAzMzYuMyAzMjkuNkwzOTQuNSAyNTZMMzM2LjMgMTgyLjRBMjAgMjAgMCAwIDEgMzY3LjcgMTU3LjZaTTE3MCAyNTZhODYgODYgMCAxIDAgMTcyIDBhODYgODYgMCAxIDAgLTE3MiAwWk0xOTggMjU2YTU4IDU4IDAgMSAwIDExNiAwYTU4IDU4IDAgMSAwIC0xMTYgMFpNMjY4IDIxNkwyNjggMjQ5LjRMMjkwLjUgMjYzLjlBMTIgMTIgMCAwIDEgMjc3LjUgMjg0LjFMMjQ5LjUgMjY2LjFBMTIgMTIgMCAwIDEgMjQ0IDI1NkwyNDQgMjE2QTEyIDEyIDAgMCAxIDI2OCAyMTZaIi8+PC9zdmc+';
+
     public static function init(): void {
         add_action( 'admin_menu',              [ __CLASS__, 'register_menu' ] );
         add_action( 'wp_dashboard_setup',      [ __CLASS__, 'register_widget' ] );
@@ -54,7 +60,7 @@ class BDCT_Admin {
             'read',
             'bdct',
             [ __CLASS__, 'page_dashboard' ],
-            'dashicons-clock',
+            self::MENU_ICON,
             85
         );
 
@@ -196,7 +202,7 @@ class BDCT_Admin {
             return '<a href="' . esc_url( $url ) . '">' . esc_html( $label ) . $arrow . '</a>';
         };
         ?>
-        <div class="wrap">
+        <div class="wrap bdct-wrap">
             <h1><?php esc_html_e( 'Sessions Log', 'bitlence-dev-code-tracker' ); ?></h1>
 
             <!-- Date / user filter -->
@@ -441,7 +447,7 @@ class BDCT_Admin {
             wp_die( esc_html__( 'Not allowed.', 'bitlence-dev-code-tracker' ) );
         }
         ?>
-        <div class="wrap">
+        <div class="wrap bdct-wrap">
             <h1><?php esc_html_e( 'Dev Code Tracker — Settings', 'bitlence-dev-code-tracker' ); ?></h1>
             <form method="post" action="options.php">
                 <?php

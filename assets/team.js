@@ -29,7 +29,7 @@
 
     function showError( tbodyId, cols ) {
         const el = document.getElementById( tbodyId );
-        if ( el ) el.innerHTML = '<tr><td colspan="' + cols + '" class="bdct-empty" style="color:#b32d2e">Failed to load data.</td></tr>';
+        if ( el ) el.innerHTML = '<tr><td colspan="' + cols + '" class="bdct-empty" style="color:#b42318">Failed to load data.</td></tr>';
     }
 
     function loadTeamSummary() {

@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name:       Bitlence Dev Code Tracker
- * Plugin URI:        https://github.com/KuldipsinhParmar/Bitlence-Dev-Code-Tracker
+ * Plugin URI:        https://bitlence.com/dev-code-tracker-wordpress.html
  * Description:       Track time spent in wp-admin per page/post with idle detection, a 30-day chart, streak tracker, and per-page breakdown.
- * Version:           1.4.0
+ * Version:           1.4.1
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Kuldip Parmar
- * Author URI:        https://github.com/KuldipsinhParmar
+ * Author URI:        https://bitlence.com/
  * License:           GPL v2 or later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       bitlence-dev-code-tracker
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BDCT_VERSION',    '1.4.0' );
+define( 'BDCT_VERSION',    '1.4.1' );
 define( 'BDCT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BDCT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

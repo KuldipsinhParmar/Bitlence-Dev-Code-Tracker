@@ -219,7 +219,7 @@
                 badge = document.createElement( 'div' );
                 badge.id = 'bdct-el-badge';
                 badge.style.cssText = 'position:fixed;bottom:20px;right:20px;'
-                    + 'background:#2271b1;color:#fff;padding:5px 12px;'
+                    + 'background:#0066ff;color:#fff;padding:5px 12px;'
                     + 'border-radius:4px;font:12px/1.4 monospace;z-index:99999;'
                     + 'box-shadow:0 2px 6px rgba(0,0,0,.25);pointer-events:none;';
                 document.body.appendChild( badge );

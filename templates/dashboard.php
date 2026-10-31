@@ -1,5 +1,5 @@
 <?php defined( 'ABSPATH' ) || exit; ?>
-<div class="wrap" id="bdct-dashboard">
+<div class="wrap bdct-wrap" id="bdct-dashboard">
     <h1><?php esc_html_e( 'Dev Code Tracker', 'bitlence-dev-code-tracker' ); ?></h1>
 
     <!-- Stat cards -->

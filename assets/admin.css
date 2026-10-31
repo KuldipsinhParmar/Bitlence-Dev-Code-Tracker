@@ -1,5 +1,87 @@
 /* Bitlence Dev Code Tracker — admin styles */
 
+/* ── Brand tokens (same values as bitlence.com and assets/logo.svg) ── */
+:root {
+    --bdct-brand: #0066ff;
+    --bdct-brand-ink: #0052cc;
+    --bdct-brand-soft: rgba(0, 102, 255, .08);
+    --bdct-brand-line: rgba(0, 102, 255, .22);
+    --bdct-ink: #0b1324;
+    --bdct-muted: #5a6478;
+    --bdct-line: #e3e8f0;
+    --bdct-danger: #b42318;
+    --bdct-shadow: 0 1px 2px rgba(11, 19, 36, .05);
+    --bdct-radius: 10px;
+}
+
+/* ── Native WP controls, on this plugin's pages only ── */
+.bdct-wrap h1 {
+    color: var(--bdct-ink);
+    font-weight: 700;
+}
+
+.bdct-wrap a:not(.button) {
+    color: var(--bdct-brand);
+}
+
+.bdct-wrap a:not(.button):hover,
+.bdct-wrap a:not(.button):focus {
+    color: var(--bdct-brand-ink);
+}
+
+.bdct-wrap .button.button-primary {
+    background: var(--bdct-brand);
+    border-color: var(--bdct-brand);
+    color: #fff;
+}
+
+.bdct-wrap .button.button-primary:hover,
+.bdct-wrap .button.button-primary:focus {
+    background: var(--bdct-brand-ink);
+    border-color: var(--bdct-brand-ink);
+    color: #fff;
+}
+
+.bdct-wrap .button.button-primary:focus {
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px var(--bdct-brand);
+}
+
+.bdct-wrap .button.button-secondary:not(.bdct-btn-reset) {
+    background: #fff;
+    border-color: var(--bdct-brand);
+    color: var(--bdct-brand);
+}
+
+.bdct-wrap .button.button-secondary:not(.bdct-btn-reset):hover,
+.bdct-wrap .button.button-secondary:not(.bdct-btn-reset):focus {
+    background: var(--bdct-brand-soft);
+    border-color: var(--bdct-brand-ink);
+    color: var(--bdct-brand-ink);
+}
+
+.bdct-wrap .button.button-secondary:not(.bdct-btn-reset):focus {
+    box-shadow: 0 0 0 1px var(--bdct-brand);
+}
+
+.bdct-wrap .button.button-link-delete {
+    background: #fff;
+    border-color: var(--bdct-danger);
+    color: var(--bdct-danger);
+}
+
+.bdct-wrap .button.button-link-delete:hover,
+.bdct-wrap .button.button-link-delete:focus {
+    background: var(--bdct-danger);
+    border-color: var(--bdct-danger);
+    color: #fff;
+}
+
+.bdct-wrap input[type]:focus,
+.bdct-wrap select:focus {
+    border-color: var(--bdct-brand);
+    box-shadow: 0 0 0 1px var(--bdct-brand);
+}
+
 /* ── Stat cards ── */
 .bdct-cards {
     display: flex;
@@ -10,17 +92,17 @@
 
 .bdct-card {
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
+    border: 1px solid var(--bdct-line);
+    border-radius: var(--bdct-radius);
     padding: 16px 24px;
     min-width: 140px;
     text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    box-shadow: var(--bdct-shadow);
 }
 
 .bdct-card-label {
     font-size: .8em;
-    color: #777;
+    color: var(--bdct-muted);
     text-transform: uppercase;
     letter-spacing: .05em;
 }
@@ -29,11 +111,12 @@
     font-size: 1.8em;
     font-weight: 700;
     margin-top: 4px;
+    color: var(--bdct-brand);
 }
 
 .bdct-streak-risk {
     font-size: .75em;
-    color: #b32d2e;
+    color: var(--bdct-danger);
     display: block;
     margin-top: 2px;
 }
@@ -41,25 +124,25 @@
 /* ── Content sections ── */
 .bdct-section {
     background: #fff;
-    border: 1px solid #c3c4c7;
-    border-radius: 4px;
+    border: 1px solid var(--bdct-line);
+    border-radius: var(--bdct-radius);
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    box-shadow: var(--bdct-shadow);
 }
 
 .bdct-section h2 {
     margin-top: 0;
     font-size: 1em;
-    color: #1d2327;
+    color: var(--bdct-ink);
 }
 
 .bdct-section--danger h2 {
-    color: #b32d2e;
+    color: var(--bdct-danger);
 }
 
 .bdct-section--danger p {
-    color: #555;
+    color: var(--bdct-muted);
     margin-top: 0;
 }
 
@@ -67,7 +150,7 @@
 #bdct-chart-msg {
     display: none;
     text-align: center;
-    color: #888;
+    color: var(--bdct-muted);
     margin: 20px 0;
 }
 
@@ -85,14 +168,15 @@
 }
 
 .bdct-btn-reset {
-    color: #b32d2e !important;
-    border-color: #b32d2e !important;
+    background: #fff !important;
+    color: var(--bdct-danger) !important;
+    border-color: var(--bdct-danger) !important;
 }
 
 .bdct-btn-reset:hover {
-    background: #b32d2e !important;
+    background: var(--bdct-danger) !important;
     color: #fff !important;
-    border-color: #b32d2e !important;
+    border-color: var(--bdct-danger) !important;
 }
 
 /* ── Dashboard widget ── */
@@ -100,6 +184,7 @@
     font-size: 2em;
     text-align: center;
     margin: 8px 0;
+    color: var(--bdct-brand);
 }
 
 .bdct-widget-link {
@@ -107,10 +192,19 @@
     margin: 4px 0 0;
 }
 
+.bdct-widget-link a {
+    color: var(--bdct-brand);
+}
+
+.bdct-widget-link a:hover,
+.bdct-widget-link a:focus {
+    color: var(--bdct-brand-ink);
+}
+
 /* ── Empty / loading states ── */
 .bdct-empty {
     text-align: center;
-    color: #888;
+    color: var(--bdct-muted);
 }
 
 /* ── Sessions log actions bar ── */

@@ -2,7 +2,7 @@
 defined( 'ABSPATH' ) || exit;
 $bdct_team_export_base = wp_nonce_url( admin_url( 'admin.php?page=bdct-team&bdct_export=team_csv' ), 'bdct_export_team_csv' );
 ?>
-<div class="wrap" id="bdct-team-page">
+<div class="wrap bdct-wrap" id="bdct-team-page">
     <h1><?php esc_html_e( 'Team Overview', 'bitlence-dev-code-tracker' ); ?></h1>
     <p class="description"><?php esc_html_e( 'Time logged by every tracked user on this site.', 'bitlence-dev-code-tracker' ); ?></p>
 

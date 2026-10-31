@@ -4,7 +4,7 @@ Tags:              time tracking, developer, admin, productivity, dashboard
 Requires at least: 6.0
 Tested up to:      7.0
 Requires PHP:      8.0
-Stable tag:        1.4.0
+Stable tag:        1.4.1
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -82,6 +82,11 @@ Yes — users with the `manage_options` capability (admins) get a dedicated **De
 
 == Changelog ==
 
+= 1.4.1 =
+* Changed: new Dev Code Tracker logo, now also shown as the admin menu icon
+* Changed: plugin pages, dashboard widget, chart and live badge now use the Bitlence brand colours
+* Changed: Plugin URI and Author URI now point to bitlence.com
+
 = 1.4.0 =
 * Added: dedicated **Team Overview** admin page (previously a section on the Dashboard) with a date-range filter and its own CSV export
 * Changed: the Sessions Log "User" column is now always visible to every user, not just admins — non-admins still only ever see their own sessions
@@ -132,6 +137,9 @@ Yes — users with the `manage_options` capability (admins) get a dedicated **De
 * SPA navigation tracking
 
 == Upgrade Notice ==
+
+= 1.4.1 =
+New logo and Bitlence brand colours. No changes to tracking or your data.
 
 = 1.4.0 =
 Team Overview is now its own admin page (with date-range filter and CSV export) instead of a Dashboard section. Also fixes a bug where a saved session's returned ID could be wrong, and a couple of small settings/filter bugs.
