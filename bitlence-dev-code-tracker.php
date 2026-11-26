@@ -3,7 +3,7 @@
  * Plugin Name:       Bitlence Dev Code Tracker
  * Plugin URI:        https://bitlence.com/dev-code-tracker-wordpress.html
  * Description:       Track time spent in wp-admin per page/post with idle detection, a 30-day chart, streak tracker, and per-page breakdown.
- * Version:           1.4.1
+ * Version:           1.4.2
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Kuldip Parmar
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'BDCT_VERSION',    '1.4.1' );
+define( 'BDCT_VERSION',    '1.4.2' );
 define( 'BDCT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'BDCT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

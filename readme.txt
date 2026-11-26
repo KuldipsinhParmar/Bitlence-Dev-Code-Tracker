@@ -2,9 +2,9 @@
 Contributors:      kuldip8213
 Tags:              time tracking, developer, admin, productivity, dashboard
 Requires at least: 6.0
-Tested up to:      7.0
+Tested up to:      7.2
 Requires PHP:      8.0
-Stable tag:        1.4.1
+Stable tag:        1.4.2
 License:           GPLv2 or later
 License URI:       https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -82,6 +82,10 @@ Yes — users with the `manage_options` capability (admins) get a dedicated **De
 
 == Changelog ==
 
+= 1.4.2 =
+* Tested with WordPress 7.2 and PHP 8.6
+* Fixed: Sessions Log and Team Overview CSV exports no longer include a PHP 8.4+ `fputcsv()` deprecation notice in the downloaded file when debug output is on
+
 = 1.4.1 =
 * Changed: new Dev Code Tracker logo, now also shown as the admin menu icon
 * Changed: plugin pages, dashboard widget, chart and live badge now use the Bitlence brand colours
@@ -137,6 +141,9 @@ Yes — users with the `manage_options` capability (admins) get a dedicated **De
 * SPA navigation tracking
 
 == Upgrade Notice ==
+
+= 1.4.2 =
+WordPress 7.2 and PHP 8.6 compatibility. Fixes a PHP deprecation notice that could appear inside CSV exports.
 
 = 1.4.1 =
 New logo and Bitlence brand colours. No changes to tracking or your data.

@@ -2,6 +2,16 @@
 
 All notable changes to Dev Code Tracker are documented here.
 
+## [1.4.2] — 2026-11-26
+
+### Fixed
+- **CSV exports on PHP 8.4+** — `maybe_export_csv()` and `maybe_export_team_csv()` called `fputcsv()` without the `$escape` argument, which is deprecated since PHP 8.4. With `WP_DEBUG` display on, the `Deprecated:` notice was written into the downloaded CSV. All four calls now pass `',', '"', ''` explicitly (empty escape = RFC 4180 quoting)
+
+### Changed
+- **Tested up to WordPress 7.2** (verified on 7.2-RC3 with PHP 8.6): PHPUnit suite passes with deprecations/notices/warnings converted to failures; all admin pages, toolbar node and both CSV exports checked with `WP_DEBUG` on; Plugin Check clean on the `bin/build.sh` zip. 7.2's switch to inline SVG admin icons doesn't affect the plugin — core still supports base64 `data:image/svg+xml` menu icons (recoloured by `svg-painter`), and the admin bar node markup (`a.ab-item`) is unchanged
+- Dev deps: `wp-phpunit/wp-phpunit` and `johnpbloch/wordpress-core` bumped from `^6` to `^7`
+- Local test DB host port moved from `3311` to `3321` (`tests/wp-tests-config-sample.php`, `tests/README.md`) — `3311` clashes with another local project's database; local `docker-compose.yml` now uses `wordpress:php8.6-apache`
+
 ## [1.4.1] — 2026-10-31
 
 ### Changed

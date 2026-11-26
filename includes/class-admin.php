@@ -376,7 +376,7 @@ class BDCT_Admin {
 
         $out    = fopen( 'php://output', 'w' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
         $header = [ 'Started', 'User', 'Page / Post', 'Type', 'Post ID', 'Duration (sec)', 'Duration' ];
-        fputcsv( $out, $header );
+        fputcsv( $out, $header, ',', '"', '' );
 
         foreach ( $sessions as $s ) {
             $sec = (int) $s['duration_sec'];
@@ -389,7 +389,7 @@ class BDCT_Admin {
                 $sec,
                 self::format_duration( $sec )
             );
-            fputcsv( $out, $row );
+            fputcsv( $out, $row, ',', '"', '' );
         }
 
         fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
@@ -423,7 +423,7 @@ class BDCT_Admin {
         if ( $has_range ) {
             $header[] = 'Selected Range';
         }
-        fputcsv( $out, $header );
+        fputcsv( $out, $header, ',', '"', '' );
 
         foreach ( $rows as $r ) {
             $row = [
@@ -435,7 +435,7 @@ class BDCT_Admin {
             if ( $has_range ) {
                 $row[] = self::format_duration( (int) ( $r['range_sec'] ?? 0 ) );
             }
-            fputcsv( $out, $row );
+            fputcsv( $out, $row, ',', '"', '' );
         }
 
         fclose( $out ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose

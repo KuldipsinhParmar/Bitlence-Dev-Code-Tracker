@@ -12,7 +12,7 @@ cp tests/wp-tests-config-sample.php tests/wp-tests-config.php
 ```
 
 `tests/wp-tests-config.php` is git-ignored — edit it if your DB credentials differ from
-`docker-compose.yml`. It expects the `db` service's port 3306 mapped to `127.0.0.1:3311` on the
+`docker-compose.yml`. It expects the `db` service's port 3306 mapped to `127.0.0.1:3321` on the
 host (already set in `docker-compose.yml`), since PHPUnit runs on the host, not inside a container.
 
 Then, any time:
